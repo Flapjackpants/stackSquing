@@ -51,6 +51,43 @@ std::vector<std::string> split_csv(const std::string& s) {
     return parts;
 }
 
+void append_unique_terms(std::vector<std::string>& dest, const std::vector<std::string>& terms) {
+    for (const auto& term : terms) {
+        if (std::find(dest.begin(), dest.end(), term) == dest.end()) {
+            dest.push_back(term);
+        }
+    }
+}
+
+bool apply_filter_tokens(ItemGroup& group, size_t start_index, const std::vector<std::string>& tokens,
+                         bool append) {
+    bool changed = false;
+    for (size_t i = start_index; i < tokens.size(); ++i) {
+        const auto& token = tokens[i];
+        const auto include_pos = token.find("include:");
+        const auto exclude_pos = token.find("exclude:");
+        if (include_pos != std::string::npos) {
+            const auto terms = split_csv(token.substr(include_pos + 8));
+            if (append) {
+                append_unique_terms(group.include, terms);
+            } else {
+                group.include = terms;
+            }
+            changed = true;
+        }
+        if (exclude_pos != std::string::npos) {
+            const auto terms = split_csv(token.substr(exclude_pos + 8));
+            if (append) {
+                append_unique_terms(group.exclude, terms);
+            } else {
+                group.exclude = terms;
+            }
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 }  // namespace
 
 std::vector<std::string> App::build_help_text() {
@@ -67,9 +104,11 @@ std::vector<std::string> App::build_help_text() {
         "Groups:",
         "  groups                List saved groups and on/off state",
         "  group add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
+        "  group edit <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
         "  group on <name>       Enable a group",
         "  group off <name>      Disable a group",
         "  group remove <name>   Delete a saved group",
+        "  group rename <old> <new> Rename a group",
         "  group order <name> <n> Set group display order",
         "",
         "Fulfillment:",
@@ -287,16 +326,9 @@ bool App::handle_command(const std::string& command) {
             group.enabled = true;
             group.order = static_cast<int>(groups_.groups().size());
 
-            for (size_t i = 3; i < tokens.size(); ++i) {
-                const auto& token = tokens[i];
-                const auto include_pos = token.find("include:");
-                const auto exclude_pos = token.find("exclude:");
-                if (include_pos != std::string::npos) {
-                    group.include = split_csv(token.substr(include_pos + 8));
-                }
-                if (exclude_pos != std::string::npos) {
-                    group.exclude = split_csv(token.substr(exclude_pos + 8));
-                }
+            if (!apply_filter_tokens(group, 3, tokens, false)) {
+                status_message_ = "Group add requires include:term[,term]";
+                return true;
             }
 
             if (group.include.empty()) {
@@ -316,7 +348,41 @@ bool App::handle_command(const std::string& command) {
             }
             return true;
         }
-        status_message_ = "Usage: group on|off|remove|order|add ...";
+        if (sub == "edit" && tokens.size() >= 4) {
+            if (auto* group = groups_.find_group(tokens[2])) {
+                if (!apply_filter_tokens(*group, 3, tokens, true)) {
+                    status_message_ = "Group edit requires include:term[,term] and/or exclude:term[,term]";
+                    return true;
+                }
+                if (groups_.save()) {
+                    status_message_ = "Updated group: " + group->name;
+                } else {
+                    status_message_ = "Failed to save group.";
+                }
+            } else {
+                status_message_ = "Group not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "rename" && tokens.size() >= 4) {
+            const std::string& old_name = tokens[2];
+            const std::string& new_name = tokens[3];
+            if (groups_.find_group(old_name) == nullptr) {
+                status_message_ = "Group not found: " + old_name;
+                return true;
+            }
+            if (groups_.find_group(new_name) != nullptr) {
+                status_message_ = "Group already exists: " + new_name;
+                return true;
+            }
+            if (groups_.rename_group(old_name, new_name)) {
+                status_message_ = "Renamed group to: " + new_name;
+            } else {
+                status_message_ = "Failed to rename group.";
+            }
+            return true;
+        }
+        status_message_ = "Usage: group on|off|remove|rename|order|add|edit ...";
         return true;
     }
     if ((cmd == "fulfill" || cmd == "a") && tokens.size() >= 2) {

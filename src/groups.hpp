@@ -20,6 +20,7 @@ public:
 
     bool add_group(const ItemGroup& group);
     bool remove_group(const std::string& name);
+    bool rename_group(const std::string& old_name, const std::string& new_name);
     ItemGroup* find_group(const std::string& name);
     const ItemGroup* find_group(const std::string& name) const;
 

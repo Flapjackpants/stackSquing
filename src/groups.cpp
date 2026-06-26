@@ -154,6 +154,21 @@ bool GroupStore::remove_group(const std::string& name) {
     return save();
 }
 
+bool GroupStore::rename_group(const std::string& old_name, const std::string& new_name) {
+    if (new_name.empty() || old_name == new_name) {
+        return false;
+    }
+    if (find_group(new_name) != nullptr) {
+        return false;
+    }
+    auto* group = find_group(old_name);
+    if (group == nullptr) {
+        return false;
+    }
+    group->name = new_name;
+    return save();
+}
+
 ItemGroup* GroupStore::find_group(const std::string& name) {
     for (auto& group : groups_) {
         if (group.name == name) {

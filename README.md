@@ -67,8 +67,10 @@ Groups are saved globally at `~/.config/stackSquing/groups.json`.
 
 - `groups` — list saved groups and on/off state
 - `group add Deepslate include:deepslate`
+- `group edit Deepslate include:brick exclude:cracked`
 - `group add Oak include:oak exclude:dark`
 - `group on Deepslate` / `group off Deepslate`
+- `group rename Deepslate DeepslateBlocks`
 - `group remove Deepslate`
 - `group order Deepslate 0`
 
