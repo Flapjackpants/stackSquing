@@ -81,6 +81,8 @@ std::vector<std::string> App::build_help_text() {
         "Navigation:",
         "  up                    Scroll up",
         "  down                  Scroll down",
+        "  Up arrow (typing)     Previous command",
+        "  Down arrow (typing)   Next command",
         "",
         "Other:",
         "  reload                Re-read the material list from disk",
@@ -111,7 +113,7 @@ int App::run() {
     rebuild_and_draw();
 
     while (!ui_.should_quit()) {
-        const std::string command = trim(ui_.read_line());
+        const std::string command = trim(ui_.read_line(command_history_));
         if (command.empty()) {
             rebuild_and_draw();
             continue;
@@ -120,6 +122,10 @@ int App::run() {
         if (!handle_command(command)) {
             ui_.shutdown();
             return 0;
+        }
+        if (!command.empty() &&
+            (command_history_.empty() || command_history_.back() != command)) {
+            command_history_.push_back(command);
         }
         rebuild_and_draw();
     }

@@ -27,7 +27,7 @@ public:
               int scroll_offset,
               const std::vector<std::string>& help_lines = {});
 
-    std::string read_line();
+    std::string read_line(std::vector<std::string>& command_history);
     bool should_quit() const { return should_quit_; }
     bool needs_redraw() const { return needs_redraw_; }
     void clear_needs_redraw() { needs_redraw_ = false; }

@@ -14,6 +14,15 @@
 
 namespace {
 
+int prompt_cursor_column(const std::string& line, int width) {
+    const std::string content = "> " + line;
+    if (static_cast<int>(content.size()) <= width - 2) {
+        return 1 + static_cast<int>(content.size());
+    }
+    const std::string visible = content.substr(content.size() - static_cast<size_t>(width - 2));
+    return 1 + static_cast<int>(visible.size());
+}
+
 volatile sig_atomic_t g_resize_flag = 0;
 
 void on_sigwinch(int) { g_resize_flag = 1; }
@@ -289,14 +298,16 @@ void NcursesRenderer::draw(const MaterialList& list,
     }
     draw_hline(height - 1);
 
-    move(height - footer_rows + 1, 2 + static_cast<int>(input_line.size()));
+    move(height - footer_rows + 1, prompt_cursor_column(input_line, width));
     refresh();
 }
 
-std::string NcursesRenderer::read_line() {
+std::string NcursesRenderer::read_line(std::vector<std::string>& command_history) {
     handle_resize();
 
     std::string line;
+    std::string saved_draft;
+    size_t history_index = command_history.size();
     const int prompt_row = LINES - 3;
 
     auto redraw_prompt = [&]() {
@@ -311,7 +322,7 @@ std::string NcursesRenderer::read_line() {
             mvaddch(prompt_row, x, ' ');
         }
         mvaddch(prompt_row, width - 1, '|');
-        move(prompt_row, 2 + static_cast<int>(line.size()));
+        move(prompt_row, prompt_cursor_column(line, width));
         refresh();
     };
 
@@ -327,15 +338,42 @@ std::string NcursesRenderer::read_line() {
             }
             continue;
         }
+        if (ch == KEY_UP) {
+            if (!command_history.empty() && history_index > 0) {
+                if (history_index == command_history.size()) {
+                    saved_draft = line;
+                }
+                --history_index;
+                line = command_history[history_index];
+                redraw_prompt();
+            }
+            continue;
+        }
+        if (ch == KEY_DOWN) {
+            if (history_index < command_history.size()) {
+                ++history_index;
+                if (history_index == command_history.size()) {
+                    line = saved_draft;
+                } else {
+                    line = command_history[history_index];
+                }
+                redraw_prompt();
+            }
+            continue;
+        }
         if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
             if (!line.empty()) {
                 line.pop_back();
+                history_index = command_history.size();
+                saved_draft.clear();
                 redraw_prompt();
             }
             continue;
         }
         if (ch >= 32 && ch <= 126) {
             line.push_back(static_cast<char>(ch));
+            history_index = command_history.size();
+            saved_draft.clear();
             redraw_prompt();
         }
     }

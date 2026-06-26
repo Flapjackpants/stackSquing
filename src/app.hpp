@@ -22,6 +22,7 @@ private:
     std::string input_line_;
     std::string status_message_;
     std::vector<std::string> help_lines_;
+    std::vector<std::string> command_history_;
     int scroll_offset_ = 0;
 
     static std::vector<std::string> build_help_text();
