@@ -41,4 +41,5 @@ struct Supergroup {
 struct AppSettings {
     QuantityColumn column = QuantityColumn::Missing;
     QuantityFormat format = QuantityFormat::Css;
+    bool hide_fulfilled_groups = true;
 };

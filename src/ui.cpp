@@ -14,13 +14,66 @@
 
 namespace {
 
-int prompt_cursor_column(const std::string& line, int width) {
+constexpr size_t kPromptPrefixLen = 2;
+
+struct PromptView {
+    std::string visible;
+    size_t scroll = 0;
+    int cursor_column = 1;
+};
+
+PromptView build_prompt_view(const std::string& line, size_t cursor, int width) {
+    PromptView view;
     const std::string content = "> " + line;
-    if (static_cast<int>(content.size()) <= width - 2) {
-        return 1 + static_cast<int>(content.size());
+    const size_t visible_width = static_cast<size_t>(std::max(0, width - 2));
+
+    if (content.size() <= visible_width) {
+        view.visible = content;
+        view.scroll = 0;
+        view.cursor_column = 1 + static_cast<int>(kPromptPrefixLen + cursor);
+        return view;
     }
-    const std::string visible = content.substr(content.size() - static_cast<size_t>(width - 2));
-    return 1 + static_cast<int>(visible.size());
+
+    size_t scroll = 0;
+    const size_t cursor_pos = kPromptPrefixLen + cursor;
+    if (cursor_pos >= visible_width) {
+        scroll = cursor_pos - visible_width + 1;
+    }
+    const size_t max_scroll = content.size() - visible_width;
+    if (scroll > max_scroll) {
+        scroll = max_scroll;
+    }
+
+    view.visible = content.substr(scroll, visible_width);
+    view.scroll = scroll;
+    view.cursor_column = 1 + static_cast<int>(cursor_pos - scroll);
+    return view;
+}
+
+void insert_char(std::string& line, size_t& cursor, char ch, bool insert_mode) {
+    if (cursor >= line.size()) {
+        line.push_back(ch);
+    } else if (insert_mode) {
+        line.insert(cursor, 1, ch);
+    } else {
+        line[cursor] = ch;
+    }
+    ++cursor;
+}
+
+void delete_backward(std::string& line, size_t& cursor) {
+    if (cursor == 0) {
+        return;
+    }
+    line.erase(cursor - 1, 1);
+    --cursor;
+}
+
+void delete_forward(std::string& line, size_t& cursor) {
+    if (cursor >= line.size()) {
+        return;
+    }
+    line.erase(cursor, 1);
 }
 
 volatile sig_atomic_t g_resize_flag = 0;
@@ -190,6 +243,7 @@ void NcursesRenderer::draw(const MaterialList& list,
     std::ostringstream meta;
     meta << "Column: " << column_label(settings.column)
          << " | Format: " << format_label(settings.format)
+         << " | HideFul: " << (settings.hide_fulfilled_groups ? "on" : "off")
          << " | Groups: " << enabled_group_names(groups);
     draw_box_row(y++, width, meta.str());
     draw_hline(y++);
@@ -320,7 +374,6 @@ void NcursesRenderer::draw(const MaterialList& list,
     }
     draw_hline(height - 1);
 
-    move(height - footer_rows + 1, prompt_cursor_column(input_line, width));
     refresh();
 }
 
@@ -328,23 +381,22 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
     handle_resize();
 
     std::string line;
+    size_t cursor = 0;
+    bool insert_mode = true;
     std::string saved_draft;
     size_t history_index = command_history.size();
     const int prompt_row = LINES - 3;
 
     auto redraw_prompt = [&]() {
         const int width = COLS;
+        const auto view = build_prompt_view(line, cursor, width);
         mvaddch(prompt_row, 0, '|');
-        std::string content = "> " + line;
-        if (static_cast<int>(content.size()) > width - 2) {
-            content = content.substr(content.size() - static_cast<size_t>(width - 2));
-        }
-        mvaddstr(prompt_row, 1, content.c_str());
-        for (int x = 1 + static_cast<int>(content.size()); x < width - 1; ++x) {
+        mvaddstr(prompt_row, 1, view.visible.c_str());
+        for (int x = 1 + static_cast<int>(view.visible.size()); x < width - 1; ++x) {
             mvaddch(prompt_row, x, ' ');
         }
         mvaddch(prompt_row, width - 1, '|');
-        move(prompt_row, prompt_cursor_column(line, width));
+        move(prompt_row, view.cursor_column);
         refresh();
     };
 
@@ -360,6 +412,7 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
             }
             continue;
         }
+
         if (ch == KEY_UP) {
             if (!command_history.empty() && history_index > 0) {
                 if (history_index == command_history.size()) {
@@ -367,6 +420,7 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
                 }
                 --history_index;
                 line = command_history[history_index];
+                cursor = line.size();
                 redraw_prompt();
             }
             continue;
@@ -379,13 +433,52 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
                 } else {
                     line = command_history[history_index];
                 }
+                cursor = line.size();
                 redraw_prompt();
             }
             continue;
         }
+        if (ch == KEY_LEFT) {
+            if (cursor > 0) {
+                --cursor;
+                redraw_prompt();
+            }
+            continue;
+        }
+        if (ch == KEY_RIGHT) {
+            if (cursor < line.size()) {
+                ++cursor;
+                redraw_prompt();
+            }
+            continue;
+        }
+        if (ch == KEY_HOME || ch == 1) {  // Home or Ctrl+A
+            cursor = 0;
+            redraw_prompt();
+            continue;
+        }
+        if (ch == KEY_END || ch == 5) {  // End or Ctrl+E
+            cursor = line.size();
+            redraw_prompt();
+            continue;
+        }
+        if (ch == KEY_IC) {  // Insert toggles insert/overwrite mode
+            insert_mode = !insert_mode;
+            redraw_prompt();
+            continue;
+        }
         if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
-            if (!line.empty()) {
-                line.pop_back();
+            if (cursor > 0) {
+                delete_backward(line, cursor);
+                history_index = command_history.size();
+                saved_draft.clear();
+                redraw_prompt();
+            }
+            continue;
+        }
+        if (ch == KEY_DC || ch == 4) {  // Delete or Ctrl+D
+            if (cursor < line.size()) {
+                delete_forward(line, cursor);
                 history_index = command_history.size();
                 saved_draft.clear();
                 redraw_prompt();
@@ -393,7 +486,7 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
             continue;
         }
         if (ch >= 32 && ch <= 126) {
-            line.push_back(static_cast<char>(ch));
+            insert_char(line, cursor, static_cast<char>(ch), insert_mode);
             history_index = command_history.size();
             saved_draft.clear();
             redraw_prompt();

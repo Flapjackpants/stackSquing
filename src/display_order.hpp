@@ -23,5 +23,6 @@ class DisplayOrderBuilder {
 public:
     static std::vector<DisplayRow> build(const MaterialList& list,
                                          const GroupStore& groups,
-                                         QuantityColumn column);
+                                         QuantityColumn column,
+                                         bool hide_fulfilled_groups = true);
 };

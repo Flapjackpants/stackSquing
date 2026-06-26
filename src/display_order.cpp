@@ -29,6 +29,30 @@ std::vector<int> matching_indices(const MaterialList& list, const GroupStore& gr
     return indices;
 }
 
+bool indices_fully_fulfilled(const std::vector<int>& indices, const MaterialList& list) {
+    if (indices.empty()) {
+        return false;
+    }
+    for (int idx : indices) {
+        if (!list.items[idx].fulfilled) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool indices_fully_fulfilled(const std::set<int>& indices, const MaterialList& list) {
+    if (indices.empty()) {
+        return false;
+    }
+    for (int idx : indices) {
+        if (!list.items[idx].fulfilled) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::set<int> unique_indices_for_supergroup(const MaterialList& list, const GroupStore& groups,
                                             const Supergroup& supergroup) {
     std::set<int> unique;
@@ -44,11 +68,15 @@ std::set<int> unique_indices_for_supergroup(const MaterialList& list, const Grou
     return unique;
 }
 
-void append_group_block(std::vector<DisplayRow>& rows, const MaterialList& list, const GroupStore& groups,
-                        const ItemGroup& group, QuantityColumn column, int& group_number, int& item_number) {
+bool append_group_block(std::vector<DisplayRow>& rows, const MaterialList& list, const GroupStore& groups,
+                        const ItemGroup& group, QuantityColumn column, bool hide_fulfilled_groups,
+                        int& group_number, int& item_number) {
     const auto member_indices = matching_indices(list, groups, group);
     if (member_indices.empty()) {
-        return;
+        return false;
+    }
+    if (hide_fulfilled_groups && indices_fully_fulfilled(member_indices, list)) {
+        return false;
     }
 
     DisplayRow header;
@@ -71,6 +99,7 @@ void append_group_block(std::vector<DisplayRow>& rows, const MaterialList& list,
         row.group = &group;
         rows.push_back(row);
     }
+    return true;
 }
 
 bool item_in_enabled_groups(const MaterialList& list, const GroupStore& groups, int item_index) {
@@ -98,7 +127,8 @@ bool item_in_enabled_supergroups(const MaterialList& list, const GroupStore& gro
 
 std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
                                                    const GroupStore& groups,
-                                                   QuantityColumn column) {
+                                                   QuantityColumn column,
+                                                   bool hide_fulfilled_groups) {
     std::vector<DisplayRow> rows;
     int item_number = 1;
     int group_number = 1;
@@ -113,6 +143,11 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
         if (unique_indices.empty()) {
             continue;
         }
+        if (hide_fulfilled_groups && indices_fully_fulfilled(unique_indices, list)) {
+            continue;
+        }
+
+        const auto supergroup_start = rows.size();
 
         DisplayRow super_header;
         super_header.kind = DisplayRowKind::SupergroupHeader;
@@ -122,12 +157,22 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
         super_header.supergroup = supergroup;
         rows.push_back(super_header);
 
+        bool any_member_shown = false;
         for (const auto& member_name : supergroup->member_groups) {
             const ItemGroup* member = groups.find_group(member_name);
             if (member == nullptr) {
                 continue;
             }
-            append_group_block(rows, list, groups, *member, column, group_number, item_number);
+            if (append_group_block(rows, list, groups, *member, column, hide_fulfilled_groups, group_number,
+                                   item_number)) {
+                any_member_shown = true;
+            }
+        }
+
+        if (!any_member_shown) {
+            rows.resize(supergroup_start);
+            --supergroup_number;
+            continue;
         }
 
         if (any_blocks) {
@@ -138,12 +183,10 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
     }
 
     for (const ItemGroup* group : enabled_groups) {
-        const auto member_indices = matching_indices(list, groups, *group);
-        if (member_indices.empty()) {
+        if (!append_group_block(rows, list, groups, *group, column, hide_fulfilled_groups, group_number,
+                                item_number)) {
             continue;
         }
-
-        append_group_block(rows, list, groups, *group, column, group_number, item_number);
 
         if (any_blocks) {
             DisplayRow sep;

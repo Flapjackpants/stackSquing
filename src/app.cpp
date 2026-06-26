@@ -141,6 +141,10 @@ std::vector<std::string> App::build_help_text() {
         "  supergroup rename <old> <new> Rename a supergroup",
         "  supergroup order <name> <n> Set supergroup display order",
         "",
+        "Display:",
+        "  hidefulfilled on      Hide groups when all items fulfilled (default)",
+        "  hidefulfilled off     Keep showing fully fulfilled groups",
+        "",
         "Fulfillment:",
         "  fulfill <n>           Mark item n fulfilled (saves to file)",
         "  a <n>                 Short for fulfill",
@@ -152,6 +156,10 @@ std::vector<std::string> App::build_help_text() {
         "  down                  Scroll down",
         "  Up arrow (typing)     Previous command",
         "  Down arrow (typing)   Next command",
+        "  Left/Right (typing)   Move cursor",
+        "  Home/End (typing)     Jump to start/end of input",
+        "  Insert (typing)       Toggle insert/overwrite mode",
+        "  Delete (typing)       Delete character after cursor",
         "",
         "Other:",
         "  reload                Re-read the material list from disk",
@@ -204,12 +212,14 @@ int App::run() {
 }
 
 void App::rebuild_and_draw() {
-    const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column);
+    const auto rows =
+        DisplayOrderBuilder::build(list_, groups_, settings_.column, settings_.hide_fulfilled_groups);
     ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_);
 }
 
 bool App::fulfill_display_number(int display_number, bool fulfilled) {
-    const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column);
+    const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column,
+                                                 settings_.hide_fulfilled_groups);
     const DisplayRow* row = nullptr;
     for (const auto& r : rows) {
         if (r.kind == DisplayRowKind::Item && r.display_number == display_number) {
@@ -277,6 +287,20 @@ bool App::handle_command(const std::string& command) {
     if (cmd == "css") {
         settings_.format = QuantityFormat::Css;
         status_message_ = "Showing chest/stack/item quantities.";
+        return true;
+    }
+    if (cmd == "hidefulfilled" && tokens.size() >= 2) {
+        if (tokens[1] == "on") {
+            settings_.hide_fulfilled_groups = true;
+            status_message_ = "Hiding fully fulfilled groups.";
+            return true;
+        }
+        if (tokens[1] == "off") {
+            settings_.hide_fulfilled_groups = false;
+            status_message_ = "Showing fully fulfilled groups.";
+            return true;
+        }
+        status_message_ = "Usage: hidefulfilled on|off";
         return true;
     }
     if (cmd == "up") {
