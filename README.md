@@ -74,7 +74,7 @@ Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `incl
 - `group remove Deepslate`
 - `group order Deepslate 0`
 
-When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`).
+When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`). Groups that belong to an enabled supergroup are only shown inside that supergroup, not on their own.
 
 ### Supergroups
 

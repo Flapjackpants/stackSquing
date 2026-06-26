@@ -102,6 +102,16 @@ bool append_group_block(std::vector<DisplayRow>& rows, const MaterialList& list,
     return true;
 }
 
+std::set<std::string> groups_in_enabled_supergroups(const GroupStore& groups) {
+    std::set<std::string> claimed;
+    for (const Supergroup* supergroup : groups.enabled_supergroups_sorted()) {
+        for (const auto& member_name : supergroup->member_groups) {
+            claimed.insert(member_name);
+        }
+    }
+    return claimed;
+}
+
 bool item_in_enabled_groups(const MaterialList& list, const GroupStore& groups, int item_index) {
     for (const ItemGroup* group : groups.enabled_groups_sorted()) {
         if (groups.matches(*group, list.items[item_index].name)) {
@@ -136,6 +146,7 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
 
     const auto enabled_supergroups = groups.enabled_supergroups_sorted();
     const auto enabled_groups = groups.enabled_groups_sorted();
+    const auto supergroup_member_names = groups_in_enabled_supergroups(groups);
     const bool any_blocks = !enabled_supergroups.empty() || !enabled_groups.empty();
 
     for (const Supergroup* supergroup : enabled_supergroups) {
@@ -183,6 +194,9 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
     }
 
     for (const ItemGroup* group : enabled_groups) {
+        if (supergroup_member_names.count(group->name)) {
+            continue;
+        }
         if (!append_group_block(rows, list, groups, *group, column, hide_fulfilled_groups, group_number,
                                 item_number)) {
             continue;
