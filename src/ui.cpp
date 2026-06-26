@@ -46,6 +46,16 @@ std::string format_label(QuantityFormat format) {
 std::string enabled_group_names(const GroupStore& groups) {
     std::ostringstream oss;
     bool first = true;
+    for (const auto& supergroup : groups.supergroups()) {
+        if (!supergroup.enabled) {
+            continue;
+        }
+        if (!first) {
+            oss << ", ";
+        }
+        oss << supergroup.name << "*";
+        first = false;
+    }
     for (const auto& group : groups.groups()) {
         if (!group.enabled) {
             continue;
@@ -244,6 +254,18 @@ void NcursesRenderer::draw(const MaterialList& list,
             }
 
             std::ostringstream line;
+            if (row.kind == DisplayRowKind::SupergroupHeader) {
+                line << "S" << std::setw(num_width - 1) << row.display_number
+                     << " | <<" << truncate(row.label, name_width - 4) << ">>"
+                     << std::string(std::max(0, name_width - 4 - static_cast<int>(row.label.size())), ' ')
+                     << " | " << std::right << std::setw(qty_width)
+                     << format_quantity(row.quantity, settings.format)
+                     << " | ";
+                attron(COLOR_PAIR(1) | A_BOLD);
+                draw_box_row(row_y, width, line.str());
+                attroff(COLOR_PAIR(1) | A_BOLD);
+                continue;
+            }
             if (row.kind == DisplayRowKind::GroupHeader) {
                 line << "G" << std::setw(num_width - 1) << row.display_number
                      << " | [" << truncate(row.label, name_width - 2) << "]"

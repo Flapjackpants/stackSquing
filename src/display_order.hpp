@@ -6,7 +6,7 @@
 #include "groups.hpp"
 #include "model.hpp"
 
-enum class DisplayRowKind { GroupHeader, Item, Separator };
+enum class DisplayRowKind { SupergroupHeader, GroupHeader, Item, Separator };
 
 struct DisplayRow {
     DisplayRowKind kind = DisplayRowKind::Item;
@@ -16,6 +16,7 @@ struct DisplayRow {
     int item_index = -1;
     bool fulfilled = false;
     const ItemGroup* group = nullptr;
+    const Supergroup* supergroup = nullptr;
 };
 
 class DisplayOrderBuilder {

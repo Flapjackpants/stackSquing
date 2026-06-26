@@ -74,7 +74,19 @@ Groups are saved globally at `~/.config/stackSquing/groups.json`.
 - `group remove Deepslate`
 - `group order Deepslate 0`
 
-When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group.
+When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals.
+
+### Supergroups
+
+Supergroups combine multiple item groups under one summary total (each item counted once, fulfilled items excluded). Saved in the same config file as groups.
+
+- `supergroups` — list saved supergroups and on/off state
+- `supergroup add Stone groups:Deepslate,Tuff`
+- `supergroup edit Stone groups:Cobblestone`
+- `supergroup on Stone` / `supergroup off Stone`
+- `supergroup rename Stone Rock`
+- `supergroup remove Stone`
+- `supergroup order Stone 0`
 
 ### Fulfillment
 

@@ -31,6 +31,13 @@ struct ItemGroup {
     int order = 0;
 };
 
+struct Supergroup {
+    std::string name;
+    std::vector<std::string> member_groups;
+    bool enabled = false;
+    int order = 0;
+};
+
 struct AppSettings {
     QuantityColumn column = QuantityColumn::Missing;
     QuantityFormat format = QuantityFormat::Css;

@@ -88,6 +88,25 @@ bool apply_filter_tokens(ItemGroup& group, size_t start_index, const std::vector
     return changed;
 }
 
+bool apply_member_group_tokens(Supergroup& supergroup, size_t start_index,
+                               const std::vector<std::string>& tokens, bool append) {
+    bool changed = false;
+    for (size_t i = start_index; i < tokens.size(); ++i) {
+        const auto& token = tokens[i];
+        const auto groups_pos = token.find("groups:");
+        if (groups_pos != std::string::npos) {
+            const auto terms = split_csv(token.substr(groups_pos + 7));
+            if (append) {
+                append_unique_terms(supergroup.member_groups, terms);
+            } else {
+                supergroup.member_groups = terms;
+            }
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 }  // namespace
 
 std::vector<std::string> App::build_help_text() {
@@ -110,6 +129,16 @@ std::vector<std::string> App::build_help_text() {
         "  group remove <name>   Delete a saved group",
         "  group rename <old> <new> Rename a group",
         "  group order <name> <n> Set group display order",
+        "",
+        "Supergroups:",
+        "  supergroups             List saved supergroups and on/off state",
+        "  supergroup add <name> groups:<group>[,<group>]",
+        "  supergroup edit <name> groups:<group>[,<group>]",
+        "  supergroup on <name>    Enable a supergroup",
+        "  supergroup off <name>   Disable a supergroup",
+        "  supergroup remove <name> Delete a supergroup",
+        "  supergroup rename <old> <new> Rename a supergroup",
+        "  supergroup order <name> <n> Set supergroup display order",
         "",
         "Fulfillment:",
         "  fulfill <n>           Mark item n fulfilled (saves to file)",
@@ -279,6 +308,17 @@ bool App::handle_command(const std::string& command) {
         status_message_ = oss.str();
         return true;
     }
+    if (cmd == "supergroups") {
+        std::ostringstream oss;
+        for (const auto& supergroup : groups_.supergroups()) {
+            oss << supergroup.name << (supergroup.enabled ? " [on]" : " [off]") << "  ";
+        }
+        if (groups_.supergroups().empty()) {
+            oss << "No saved supergroups.";
+        }
+        status_message_ = oss.str();
+        return true;
+    }
     if (cmd == "group" && tokens.size() >= 2) {
         const std::string& sub = tokens[1];
         if (sub == "on" && tokens.size() >= 3) {
@@ -383,6 +423,108 @@ bool App::handle_command(const std::string& command) {
             return true;
         }
         status_message_ = "Usage: group on|off|remove|rename|order|add|edit ...";
+        return true;
+    }
+    if (cmd == "supergroup" && tokens.size() >= 2) {
+        const std::string& sub = tokens[1];
+        if (sub == "on" && tokens.size() >= 3) {
+            if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
+                supergroup->enabled = true;
+                groups_.save();
+                status_message_ = "Enabled supergroup: " + supergroup->name;
+            } else {
+                status_message_ = "Supergroup not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "off" && tokens.size() >= 3) {
+            if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
+                supergroup->enabled = false;
+                groups_.save();
+                status_message_ = "Disabled supergroup: " + supergroup->name;
+            } else {
+                status_message_ = "Supergroup not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "remove" && tokens.size() >= 3) {
+            if (groups_.remove_supergroup(tokens[2])) {
+                status_message_ = "Removed supergroup: " + tokens[2];
+            } else {
+                status_message_ = "Supergroup not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "order" && tokens.size() >= 4) {
+            if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
+                supergroup->order = std::stoi(tokens[3]);
+                groups_.save();
+                groups_.load();
+                status_message_ = "Updated supergroup order.";
+            } else {
+                status_message_ = "Supergroup not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "add" && tokens.size() >= 3) {
+            Supergroup supergroup;
+            supergroup.name = tokens[2];
+            supergroup.enabled = true;
+            supergroup.order = static_cast<int>(groups_.supergroups().size());
+
+            if (!apply_member_group_tokens(supergroup, 3, tokens, false) ||
+                supergroup.member_groups.empty()) {
+                status_message_ = "Supergroup add requires groups:Group1[,Group2]";
+                return true;
+            }
+
+            if (groups_.find_supergroup(supergroup.name)) {
+                status_message_ = "Supergroup already exists: " + supergroup.name;
+                return true;
+            }
+
+            if (groups_.add_supergroup(supergroup)) {
+                status_message_ = "Added supergroup: " + supergroup.name;
+            } else {
+                status_message_ = "Failed to save supergroup.";
+            }
+            return true;
+        }
+        if (sub == "edit" && tokens.size() >= 4) {
+            if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
+                if (!apply_member_group_tokens(*supergroup, 3, tokens, true)) {
+                    status_message_ = "Supergroup edit requires groups:Group1[,Group2]";
+                    return true;
+                }
+                if (groups_.save()) {
+                    status_message_ = "Updated supergroup: " + supergroup->name;
+                } else {
+                    status_message_ = "Failed to save supergroup.";
+                }
+            } else {
+                status_message_ = "Supergroup not found: " + tokens[2];
+            }
+            return true;
+        }
+        if (sub == "rename" && tokens.size() >= 4) {
+            const std::string& old_name = tokens[2];
+            const std::string& new_name = tokens[3];
+            if (groups_.find_supergroup(old_name) == nullptr) {
+                status_message_ = "Supergroup not found: " + old_name;
+                return true;
+            }
+            if (groups_.find_supergroup(new_name) != nullptr) {
+                status_message_ = "Supergroup already exists: " + new_name;
+                return true;
+            }
+            if (groups_.rename_supergroup(old_name, new_name)) {
+                status_message_ = "Renamed supergroup to: " + new_name;
+            } else {
+                status_message_ = "Failed to rename supergroup.";
+            }
+            return true;
+        }
+        status_message_ = "Usage: supergroup on|off|remove|rename|order|add|edit ...";
         return true;
     }
     if ((cmd == "fulfill" || cmd == "a") && tokens.size() >= 2) {
