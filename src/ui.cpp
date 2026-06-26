@@ -3,6 +3,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -129,7 +130,8 @@ void NcursesRenderer::draw(const MaterialList& list,
                            const GroupStore& groups,
                            const std::string& input_line,
                            const std::string& status_message,
-                           int scroll_offset) {
+                           int scroll_offset,
+                           const std::vector<std::string>& help_lines) {
     handle_resize();
     clear();
 
@@ -173,87 +175,108 @@ void NcursesRenderer::draw(const MaterialList& list,
     draw_box_row(y++, width, meta.str());
     draw_hline(y++);
 
-    std::ostringstream header;
-    header << " " << std::setw(num_width - 1) << "#"
-           << " | " << std::left << std::setw(name_width) << "Item"
-           << " | " << std::right << std::setw(qty_width) << "Qty"
-           << " | " << std::left << std::setw(status_width) << "Status";
-    draw_box_row(y++, width, header.str());
-
-    std::string divider;
-    divider.append(num_width, '-');
-    divider += "-+-";
-    divider.append(name_width, '-');
-    divider += "-+-";
-    divider.append(qty_width, '-');
-    divider += "-+-";
-    divider.append(status_width, '-');
-    draw_box_row(y++, width, divider);
+    draw_hline(y++);
 
     const int table_top = y;
     const int footer_rows = 4;
     const int visible_rows = height - table_top - footer_rows;
-    const int total_rows = static_cast<int>(rows.size());
-    int max_scroll = std::max(0, total_rows - visible_rows);
-    int effective_scroll = std::min(scroll_offset, max_scroll);
+    const bool showing_help = !help_lines.empty();
 
-    for (int i = 0; i < visible_rows; ++i) {
-        const int row_idx = effective_scroll + i;
-        if (row_idx >= total_rows) {
-            break;
+    if (showing_help) {
+        draw_box_row(y++, width, "Help");
+        draw_box_row(y++, width, std::string(width - 4, '-'));
+
+        const int total_rows = static_cast<int>(help_lines.size());
+        const int max_scroll = std::max(0, total_rows - visible_rows + 2);
+        const int effective_scroll = std::min(scroll_offset, max_scroll);
+
+        for (int i = 0; i < visible_rows - 2; ++i) {
+            const int row_idx = effective_scroll + i;
+            if (row_idx >= total_rows) {
+                break;
+            }
+            draw_box_row(table_top + 2 + i, width, help_lines[row_idx]);
         }
-        const auto& row = rows[row_idx];
-        const int row_y = table_top + i;
+    } else {
+        std::ostringstream header;
+        header << " " << std::setw(num_width - 1) << "#"
+               << " | " << std::left << std::setw(name_width) << "Item"
+               << " | " << std::right << std::setw(qty_width) << "Qty"
+               << " | " << std::left << std::setw(status_width) << "Status";
+        draw_box_row(y++, width, header.str());
 
-        if (row.kind == DisplayRowKind::Separator) {
-            attron(COLOR_PAIR(4) | A_DIM);
-            draw_box_row(row_y, width, std::string(name_width + num_width + qty_width + status_width + 6, '-'));
-            attroff(COLOR_PAIR(4) | A_DIM);
-            continue;
-        }
+        std::string divider;
+        divider.append(num_width, '-');
+        divider += "-+-";
+        divider.append(name_width, '-');
+        divider += "-+-";
+        divider.append(qty_width, '-');
+        divider += "-+-";
+        divider.append(status_width, '-');
+        draw_box_row(y++, width, divider);
 
-        std::ostringstream line;
-        if (row.kind == DisplayRowKind::GroupHeader) {
-            line << "G" << std::setw(num_width - 1) << row.display_number
-                 << " | [" << truncate(row.label, name_width - 2) << "]"
-                 << std::string(std::max(0, name_width - 2 - static_cast<int>(row.label.size())), ' ')
+        const int total_rows = static_cast<int>(rows.size());
+        const int max_scroll = std::max(0, total_rows - visible_rows + 2);
+        const int effective_scroll = std::min(scroll_offset, max_scroll);
+
+        for (int i = 0; i < visible_rows - 2; ++i) {
+            const int row_idx = effective_scroll + i;
+            if (row_idx >= total_rows) {
+                break;
+            }
+            const auto& row = rows[row_idx];
+            const int row_y = table_top + 2 + i;
+
+            if (row.kind == DisplayRowKind::Separator) {
+                attron(COLOR_PAIR(4) | A_DIM);
+                draw_box_row(row_y, width, std::string(name_width + num_width + qty_width + status_width + 6, '-'));
+                attroff(COLOR_PAIR(4) | A_DIM);
+                continue;
+            }
+
+            std::ostringstream line;
+            if (row.kind == DisplayRowKind::GroupHeader) {
+                line << "G" << std::setw(num_width - 1) << row.display_number
+                     << " | [" << truncate(row.label, name_width - 2) << "]"
+                     << std::string(std::max(0, name_width - 2 - static_cast<int>(row.label.size())), ' ')
+                     << " | " << std::right << std::setw(qty_width)
+                     << format_quantity(row.quantity, settings.format)
+                     << " | ";
+                attron(COLOR_PAIR(2) | A_BOLD);
+                draw_box_row(row_y, width, line.str());
+                attroff(COLOR_PAIR(2) | A_BOLD);
+                continue;
+            }
+
+            std::string display_name = row.label;
+            int attrs = 0;
+            if (row.fulfilled) {
+#ifdef A_STRIKETHROUGH
+                if (strikethrough_supported_) {
+                    attrs |= A_STRIKETHROUGH;
+                } else {
+                    display_name = "[x] " + display_name;
+                }
+#else
+                display_name = "[x] " + display_name;
+#endif
+                attrs |= A_DIM;
+            }
+
+            line << " " << std::setw(num_width - 1) << row.display_number
+                 << " | " << std::left << std::setw(name_width) << truncate(display_name, name_width)
                  << " | " << std::right << std::setw(qty_width)
                  << format_quantity(row.quantity, settings.format)
-                 << " | ";
-            attron(COLOR_PAIR(2) | A_BOLD);
-            draw_box_row(row_y, width, line.str());
-            attroff(COLOR_PAIR(2) | A_BOLD);
-            continue;
-        }
+                 << " | " << std::left << std::setw(status_width)
+                 << (row.fulfilled ? "fulfilled" : "");
 
-        std::string display_name = row.label;
-        int attrs = 0;
-        if (row.fulfilled) {
-#ifdef A_STRIKETHROUGH
-            if (strikethrough_supported_) {
-                attrs |= A_STRIKETHROUGH;
-            } else {
-                display_name = "[x] " + display_name;
+            if (attrs) {
+                attron(attrs);
             }
-#else
-            display_name = "[x] " + display_name;
-#endif
-            attrs |= A_DIM;
-        }
-
-        line << " " << std::setw(num_width - 1) << row.display_number
-             << " | " << std::left << std::setw(name_width) << truncate(display_name, name_width)
-             << " | " << std::right << std::setw(qty_width)
-             << format_quantity(row.quantity, settings.format)
-             << " | " << std::left << std::setw(status_width)
-             << (row.fulfilled ? "fulfilled" : "");
-
-        if (attrs) {
-            attron(attrs);
-        }
-        draw_box_row(row_y, width, line.str());
-        if (attrs) {
-            attroff(attrs);
+            draw_box_row(row_y, width, line.str());
+            if (attrs) {
+                attroff(attrs);
+            }
         }
     }
 

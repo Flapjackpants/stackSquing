@@ -10,15 +10,28 @@ Interactive terminal tool for Litematica ASCII material lists. View totals in ra
 
 ## Build
 
+### Using build.sh (recommended)
+
+```bash
+./build.sh          # clean, build, and install to ~/.local/bin
+./build.sh all      # same as above
+./build.sh clean    # remove build/
+./build.sh build    # configure and compile
+./build.sh install  # install to ~/.local/bin
+```
+
+Install to a custom location:
+
+```bash
+INSTALL_PREFIX=/usr/local ./build.sh install
+```
+
+### Manual build
+
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-```
-
-## Install
-
-```bash
-cmake --install build
+cmake --install build --prefix ~/.local
 ```
 
 Or copy the binary manually:
@@ -34,6 +47,8 @@ stackSquing /path/to/material_list.txt
 ```
 
 ## Usage
+
+Type `help` inside the app for a full scrollable list of commands.
 
 ### Quantity column
 
@@ -66,10 +81,14 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 - `fulfill 3` or `a 3`
 - `unfulfill 3` or `u 3`
 
+### Navigation
+
+- `up` / `down` — scroll the material list or help screen
+
 ### Other
 
 - `reload` — re-read the material list from disk
-- `help` — command summary
+- `help` — show all available commands
 - `quit` or `q` — exit
 
 ## Example
@@ -77,4 +96,3 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 ```bash
 stackSquing examples/sample_material_list.txt
 ```
-# stackSquing

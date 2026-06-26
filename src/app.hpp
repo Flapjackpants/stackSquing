@@ -21,8 +21,10 @@ private:
 
     std::string input_line_;
     std::string status_message_;
+    std::vector<std::string> help_lines_;
     int scroll_offset_ = 0;
 
+    static std::vector<std::string> build_help_text();
     void rebuild_and_draw();
     bool handle_command(const std::string& command);
     bool fulfill_display_number(int display_number, bool fulfilled);

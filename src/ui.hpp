@@ -24,7 +24,8 @@ public:
               const GroupStore& groups,
               const std::string& input_line,
               const std::string& status_message,
-              int scroll_offset);
+              int scroll_offset,
+              const std::vector<std::string>& help_lines = {});
 
     std::string read_line();
     bool should_quit() const { return should_quit_; }

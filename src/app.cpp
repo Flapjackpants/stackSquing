@@ -53,6 +53,42 @@ std::vector<std::string> split_csv(const std::string& s) {
 
 }  // namespace
 
+std::vector<std::string> App::build_help_text() {
+    return {
+        "Quantity column:",
+        "  total                 Show Total column",
+        "  missing               Show Missing column (default)",
+        "  available             Show Available column",
+        "",
+        "Quantity format:",
+        "  raw                   Plain item counts",
+        "  css                   Chests/stacks/items (e.g. 5c+5s+10)",
+        "",
+        "Groups:",
+        "  groups                List saved groups and on/off state",
+        "  group add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
+        "  group on <name>       Enable a group",
+        "  group off <name>      Disable a group",
+        "  group remove <name>   Delete a saved group",
+        "  group order <name> <n> Set group display order",
+        "",
+        "Fulfillment:",
+        "  fulfill <n>           Mark item n fulfilled (saves to file)",
+        "  a <n>                 Short for fulfill",
+        "  unfulfill <n>         Remove fulfillment marker",
+        "  u <n>                 Short for unfulfill",
+        "",
+        "Navigation:",
+        "  up                    Scroll up",
+        "  down                  Scroll down",
+        "",
+        "Other:",
+        "  reload                Re-read the material list from disk",
+        "  help                  Show this help screen",
+        "  quit, q, exit         Exit stackSquing",
+    };
+}
+
 App::App(std::string file_path) : file_path_(std::move(file_path)) {}
 
 int App::run() {
@@ -94,7 +130,7 @@ int App::run() {
 
 void App::rebuild_and_draw() {
     const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column);
-    ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_);
+    ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_);
 }
 
 bool App::fulfill_display_number(int display_number, bool fulfilled) {
@@ -130,12 +166,17 @@ bool App::handle_command(const std::string& command) {
 
     const std::string& cmd = tokens[0];
 
+    if (cmd != "help" && cmd != "up" && cmd != "down" && !help_lines_.empty()) {
+        help_lines_.clear();
+    }
+
     if (cmd == "q" || cmd == "quit" || cmd == "exit") {
         return false;
     }
     if (cmd == "help") {
-        status_message_ =
-            "Commands: total|missing|available, raw|css, groups, group ..., fulfill/a, unfulfill/u, up/down, reload, quit";
+        help_lines_ = build_help_text();
+        scroll_offset_ = 0;
+        status_message_ = "Showing help. Use up/down to scroll.";
         return true;
     }
     if (cmd == "total") {
