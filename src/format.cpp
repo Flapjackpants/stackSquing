@@ -35,6 +35,7 @@ std::string format_css(const CssQty& q) {
             oss << '+';
         }
         oss << q.items;
+        first = false;
     }
     if (first) {
         return "0";

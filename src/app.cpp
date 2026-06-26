@@ -123,6 +123,7 @@ std::vector<std::string> App::build_help_text() {
         "Groups:",
         "  groups                List saved groups and on/off state",
         "  group add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
+        "                        (any include term matches; exclude terms disqualify)",
         "  group edit <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
         "  group on <name>       Enable a group",
         "  group off <name>      Disable a group",

@@ -63,7 +63,7 @@ Type `help` inside the app for a full scrollable list of commands.
 
 ### Groups
 
-Groups are saved globally at `~/.config/stackSquing/groups.json`.
+Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). `exclude` terms still disqualify a match.
 
 - `groups` — list saved groups and on/off state
 - `group add Deepslate include:deepslate`

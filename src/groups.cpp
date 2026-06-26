@@ -147,18 +147,28 @@ bool GroupStore::save() const {
 }
 
 bool GroupStore::matches(const ItemGroup& group, const std::string& item_name) const {
+    if (group.include.empty()) {
+        return false;
+    }
+
     const auto lower_name = to_lower(item_name);
+    bool matched_include = false;
     for (const auto& term : group.include) {
-        if (lower_name.find(to_lower(term)) == std::string::npos) {
-            return false;
+        if (lower_name.find(to_lower(term)) != std::string::npos) {
+            matched_include = true;
+            break;
         }
     }
+    if (!matched_include) {
+        return false;
+    }
+
     for (const auto& term : group.exclude) {
         if (lower_name.find(to_lower(term)) != std::string::npos) {
             return false;
         }
     }
-    return !group.include.empty();
+    return true;
 }
 
 std::vector<const ItemGroup*> GroupStore::enabled_groups_sorted() const {
