@@ -18,8 +18,10 @@ public:
     bool save() const;
 
     bool matches(const ItemGroup& group, const std::string& item_name) const;
+    bool matches(const Supergroup& supergroup, const std::string& group_name) const;
     std::vector<const ItemGroup*> enabled_groups_sorted() const;
     std::vector<const Supergroup*> enabled_supergroups_sorted() const;
+    std::vector<const ItemGroup*> matching_member_groups(const Supergroup& supergroup) const;
 
     bool add_group(const ItemGroup& group);
     bool remove_group(const std::string& name);

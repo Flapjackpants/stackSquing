@@ -74,8 +74,8 @@ void append_unique_terms(std::vector<std::string>& dest, const std::vector<std::
     }
 }
 
-bool apply_filter_tokens(ItemGroup& group, size_t start_index, const std::vector<std::string>& tokens,
-                         bool append) {
+bool apply_filter_tokens(std::vector<std::string>& include, std::vector<std::string>& exclude,
+                         size_t start_index, const std::vector<std::string>& tokens, bool append) {
     bool changed = false;
     for (size_t i = start_index; i < tokens.size(); ++i) {
         const auto& token = tokens[i];
@@ -84,37 +84,18 @@ bool apply_filter_tokens(ItemGroup& group, size_t start_index, const std::vector
         if (include_pos != std::string::npos) {
             const auto terms = split_csv(token.substr(include_pos + 8));
             if (append) {
-                append_unique_terms(group.include, terms);
+                append_unique_terms(include, terms);
             } else {
-                group.include = terms;
+                include = terms;
             }
             changed = true;
         }
         if (exclude_pos != std::string::npos) {
             const auto terms = split_csv(token.substr(exclude_pos + 8));
             if (append) {
-                append_unique_terms(group.exclude, terms);
+                append_unique_terms(exclude, terms);
             } else {
-                group.exclude = terms;
-            }
-            changed = true;
-        }
-    }
-    return changed;
-}
-
-bool apply_member_group_tokens(Supergroup& supergroup, size_t start_index,
-                               const std::vector<std::string>& tokens, bool append) {
-    bool changed = false;
-    for (size_t i = start_index; i < tokens.size(); ++i) {
-        const auto& token = tokens[i];
-        const auto groups_pos = token.find("groups:");
-        if (groups_pos != std::string::npos) {
-            const auto terms = split_csv(token.substr(groups_pos + 7));
-            if (append) {
-                append_unique_terms(supergroup.member_groups, terms);
-            } else {
-                supergroup.member_groups = terms;
+                exclude = terms;
             }
             changed = true;
         }
@@ -148,8 +129,9 @@ std::vector<std::string> App::build_help_text() {
         "",
         "Supergroups:",
         "  supergroups             List saved supergroups and on/off state",
-        "  supergroup add <name> groups:<group>[,<group>]",
-        "  supergroup edit <name> groups:<group>[,<group>]",
+        "  supergroup add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
+        "                        (matches group names; any include term matches)",
+        "  supergroup edit <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
         "  supergroup on <name>    Enable a supergroup",
         "  supergroup off <name>   Disable a supergroup",
         "  supergroup remove <name> Delete a supergroup",
@@ -506,7 +488,7 @@ bool App::handle_command(const std::string& command) {
             group.enabled = true;
             group.order = static_cast<int>(groups_.groups().size());
 
-            if (!apply_filter_tokens(group, 3, tokens, false)) {
+            if (!apply_filter_tokens(group.include, group.exclude, 3, tokens, false)) {
                 status_message_ = "Group add requires include:term[,term]";
                 return true;
             }
@@ -530,7 +512,7 @@ bool App::handle_command(const std::string& command) {
         }
         if (sub == "edit" && tokens.size() >= 4) {
             if (auto* group = groups_.find_group(tokens[2])) {
-                if (!apply_filter_tokens(*group, 3, tokens, true)) {
+                if (!apply_filter_tokens(group->include, group->exclude, 3, tokens, true)) {
                     status_message_ = "Group edit requires include:term[,term] and/or exclude:term[,term]";
                     return true;
                 }
@@ -612,9 +594,9 @@ bool App::handle_command(const std::string& command) {
             supergroup.enabled = true;
             supergroup.order = static_cast<int>(groups_.supergroups().size());
 
-            if (!apply_member_group_tokens(supergroup, 3, tokens, false) ||
-                supergroup.member_groups.empty()) {
-                status_message_ = "Supergroup add requires groups:Group1[,Group2]";
+            if (!apply_filter_tokens(supergroup.include, supergroup.exclude, 3, tokens, false) ||
+                supergroup.include.empty()) {
+                status_message_ = "Supergroup add requires include:term[,term]";
                 return true;
             }
 
@@ -632,8 +614,8 @@ bool App::handle_command(const std::string& command) {
         }
         if (sub == "edit" && tokens.size() >= 4) {
             if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
-                if (!apply_member_group_tokens(*supergroup, 3, tokens, true)) {
-                    status_message_ = "Supergroup edit requires groups:Group1[,Group2]";
+                if (!apply_filter_tokens(supergroup->include, supergroup->exclude, 3, tokens, true)) {
+                    status_message_ = "Supergroup edit requires include:term[,term] and/or exclude:term[,term]";
                     return true;
                 }
                 if (groups_.save()) {

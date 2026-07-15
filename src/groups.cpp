@@ -46,6 +46,32 @@ void sort_supergroups(std::vector<Supergroup>& supergroups) {
     });
 }
 
+bool matches_filter(const std::vector<std::string>& include, const std::vector<std::string>& exclude,
+                    const std::string& text) {
+    if (include.empty()) {
+        return false;
+    }
+
+    const auto lower_name = to_lower(text);
+    bool matched_include = false;
+    for (const auto& term : include) {
+        if (lower_name.find(to_lower(term)) != std::string::npos) {
+            matched_include = true;
+            break;
+        }
+    }
+    if (!matched_include) {
+        return false;
+    }
+
+    for (const auto& term : exclude) {
+        if (lower_name.find(to_lower(term)) != std::string::npos) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 GroupStore::GroupStore() : config_path_(expand_home("~/.config/stackSquing/groups.json")) {}
@@ -93,9 +119,24 @@ bool GroupStore::load() {
             supergroup.name = entry.value("name", "");
             supergroup.enabled = entry.value("enabled", false);
             supergroup.order = entry.value("order", 0);
-            if (entry.contains("member_groups") && entry["member_groups"].is_array()) {
+            if (entry.contains("include") && entry["include"].is_array()) {
+                for (const auto& term : entry["include"]) {
+                    supergroup.include.push_back(term.get<std::string>());
+                }
+            }
+            if (entry.contains("exclude") && entry["exclude"].is_array()) {
+                for (const auto& term : entry["exclude"]) {
+                    supergroup.exclude.push_back(term.get<std::string>());
+                }
+            }
+            // Migrate legacy member_groups: exact group names become include terms.
+            if (supergroup.include.empty() && entry.contains("member_groups") &&
+                entry["member_groups"].is_array()) {
                 for (const auto& member : entry["member_groups"]) {
-                    supergroup.member_groups.push_back(member.get<std::string>());
+                    const auto name = member.get<std::string>();
+                    if (!name.empty()) {
+                        supergroup.include.push_back(name);
+                    }
                 }
             }
             if (!supergroup.name.empty()) {
@@ -133,7 +174,8 @@ bool GroupStore::save() const {
         entry["name"] = supergroup.name;
         entry["enabled"] = supergroup.enabled;
         entry["order"] = supergroup.order;
-        entry["member_groups"] = supergroup.member_groups;
+        entry["include"] = supergroup.include;
+        entry["exclude"] = supergroup.exclude;
         supergroups.push_back(entry);
     }
     doc["supergroups"] = supergroups;
@@ -147,28 +189,11 @@ bool GroupStore::save() const {
 }
 
 bool GroupStore::matches(const ItemGroup& group, const std::string& item_name) const {
-    if (group.include.empty()) {
-        return false;
-    }
+    return matches_filter(group.include, group.exclude, item_name);
+}
 
-    const auto lower_name = to_lower(item_name);
-    bool matched_include = false;
-    for (const auto& term : group.include) {
-        if (lower_name.find(to_lower(term)) != std::string::npos) {
-            matched_include = true;
-            break;
-        }
-    }
-    if (!matched_include) {
-        return false;
-    }
-
-    for (const auto& term : group.exclude) {
-        if (lower_name.find(to_lower(term)) != std::string::npos) {
-            return false;
-        }
-    }
-    return true;
+bool GroupStore::matches(const Supergroup& supergroup, const std::string& group_name) const {
+    return matches_filter(supergroup.include, supergroup.exclude, group_name);
 }
 
 std::vector<const ItemGroup*> GroupStore::enabled_groups_sorted() const {
@@ -200,6 +225,16 @@ std::vector<const Supergroup*> GroupStore::enabled_supergroups_sorted() const {
         }
         return a->name < b->name;
     });
+    return result;
+}
+
+std::vector<const ItemGroup*> GroupStore::matching_member_groups(const Supergroup& supergroup) const {
+    std::vector<const ItemGroup*> result;
+    for (const ItemGroup* group : enabled_groups_sorted()) {
+        if (matches(supergroup, group->name)) {
+            result.push_back(group);
+        }
+    }
     return result;
 }
 
@@ -309,16 +344,23 @@ const Supergroup* GroupStore::find_supergroup(const std::string& name) const {
 
 void GroupStore::remove_group_references(const std::string& name) {
     for (auto& supergroup : supergroups_) {
-        const auto it = std::remove(supergroup.member_groups.begin(), supergroup.member_groups.end(), name);
-        supergroup.member_groups.erase(it, supergroup.member_groups.end());
+        const auto rem_inc = std::remove(supergroup.include.begin(), supergroup.include.end(), name);
+        supergroup.include.erase(rem_inc, supergroup.include.end());
+        const auto rem_exc = std::remove(supergroup.exclude.begin(), supergroup.exclude.end(), name);
+        supergroup.exclude.erase(rem_exc, supergroup.exclude.end());
     }
 }
 
 void GroupStore::rename_group_references(const std::string& old_name, const std::string& new_name) {
     for (auto& supergroup : supergroups_) {
-        for (auto& member : supergroup.member_groups) {
-            if (member == old_name) {
-                member = new_name;
+        for (auto& term : supergroup.include) {
+            if (term == old_name) {
+                term = new_name;
+            }
+        }
+        for (auto& term : supergroup.exclude) {
+            if (term == old_name) {
+                term = new_name;
             }
         }
     }

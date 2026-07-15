@@ -53,14 +53,10 @@ bool indices_fully_fulfilled(const std::set<int>& indices, const MaterialList& l
     return true;
 }
 
-std::set<int> unique_indices_for_supergroup(const MaterialList& list, const GroupStore& groups,
-                                            const Supergroup& supergroup) {
+std::set<int> unique_indices_for_groups(const MaterialList& list, const GroupStore& groups,
+                                        const std::vector<const ItemGroup*>& member_groups) {
     std::set<int> unique;
-    for (const auto& member_name : supergroup.member_groups) {
-        const ItemGroup* member = groups.find_group(member_name);
-        if (member == nullptr) {
-            continue;
-        }
+    for (const ItemGroup* member : member_groups) {
         for (int idx : matching_indices(list, groups, *member)) {
             unique.insert(idx);
         }
@@ -105,8 +101,8 @@ bool append_group_block(std::vector<DisplayRow>& rows, const MaterialList& list,
 std::set<std::string> groups_in_enabled_supergroups(const GroupStore& groups) {
     std::set<std::string> claimed;
     for (const Supergroup* supergroup : groups.enabled_supergroups_sorted()) {
-        for (const auto& member_name : supergroup->member_groups) {
-            claimed.insert(member_name);
+        for (const ItemGroup* member : groups.matching_member_groups(*supergroup)) {
+            claimed.insert(member->name);
         }
     }
     return claimed;
@@ -123,9 +119,8 @@ bool item_in_enabled_groups(const MaterialList& list, const GroupStore& groups, 
 
 bool item_in_enabled_supergroups(const MaterialList& list, const GroupStore& groups, int item_index) {
     for (const Supergroup* supergroup : groups.enabled_supergroups_sorted()) {
-        for (const auto& member_name : supergroup->member_groups) {
-            const ItemGroup* member = groups.find_group(member_name);
-            if (member != nullptr && groups.matches(*member, list.items[item_index].name)) {
+        for (const ItemGroup* member : groups.matching_member_groups(*supergroup)) {
+            if (groups.matches(*member, list.items[item_index].name)) {
                 return true;
             }
         }
@@ -146,7 +141,7 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
 
     const auto enabled_supergroups = groups.enabled_supergroups_sorted();
     const auto enabled_groups = groups.enabled_groups_sorted();
-    const auto supergroup_member_names = groups_in_enabled_supergroups(groups);
+    const auto claimed_group_names = groups_in_enabled_supergroups(groups);
     const bool any_blocks = !enabled_supergroups.empty() || !enabled_groups.empty();
 
     bool any_ungrouped = false;
@@ -173,7 +168,8 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
     }
 
     for (const Supergroup* supergroup : enabled_supergroups) {
-        const auto unique_indices = unique_indices_for_supergroup(list, groups, *supergroup);
+        const auto members = groups.matching_member_groups(*supergroup);
+        const auto unique_indices = unique_indices_for_groups(list, groups, members);
         if (unique_indices.empty()) {
             continue;
         }
@@ -192,11 +188,7 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
         rows.push_back(super_header);
 
         bool any_member_shown = false;
-        for (const auto& member_name : supergroup->member_groups) {
-            const ItemGroup* member = groups.find_group(member_name);
-            if (member == nullptr) {
-                continue;
-            }
+        for (const ItemGroup* member : members) {
             if (append_group_block(rows, list, groups, *member, column, hide_fulfilled_groups, group_number,
                                    item_number)) {
                 any_member_shown = true;
@@ -217,7 +209,7 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
     }
 
     for (const ItemGroup* group : enabled_groups) {
-        if (supergroup_member_names.count(group->name)) {
+        if (claimed_group_names.count(group->name)) {
             continue;
         }
         if (!append_group_block(rows, list, groups, *group, column, hide_fulfilled_groups, group_number,

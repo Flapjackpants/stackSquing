@@ -33,7 +33,8 @@ struct ItemGroup {
 
 struct Supergroup {
     std::string name;
-    std::vector<std::string> member_groups;
+    std::vector<std::string> include;
+    std::vector<std::string> exclude;
     bool enabled = false;
     int order = 0;
 };

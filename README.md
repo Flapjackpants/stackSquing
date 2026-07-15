@@ -87,11 +87,11 @@ When groups are enabled, matching items are shown in consecutive blocks with a h
 
 ### Supergroups
 
-Supergroups combine multiple item groups under one summary total (each item counted once, fulfilled items excluded). Saved in the same config file as groups.
+Supergroups nest matching item groups under one summary total (each item counted once, fulfilled items excluded). Membership uses the same `include`/`exclude` syntax as groups, but terms match **group names** (not item names). Saved in the same config file as groups.
 
 - `supergroups` — list saved supergroups and on/off state
-- `supergroup add Stone groups:Deepslate,Tuff`
-- `supergroup edit Stone groups:Cobblestone`
+- `supergroup add smelting include:glass,terracotta,nether`
+- `supergroup edit wood include:oak,birch exclude:dark`
 - `supergroup on Stone` / `supergroup off Stone`
 - `supergroup rename Stone Rock`
 - `supergroup remove Stone`
