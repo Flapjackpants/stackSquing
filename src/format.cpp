@@ -3,15 +3,29 @@
 #include <sstream>
 #include <string>
 
-CssQty to_css(int n) {
+#include "stack_size.hpp"
+
+CssQty to_css(int n, int stack_size) {
     CssQty q;
     if (n <= 0) {
         return q;
     }
-    q.chests = n / kItemsPerChest;
-    n %= kItemsPerChest;
-    q.stacks = n / kItemsPerStack;
-    q.items = n % kItemsPerStack;
+    if (stack_size <= 0) {
+        stack_size = kDefaultItemsPerStack;
+    }
+
+    if (stack_size == 1) {
+        // Unstackable: each chest slot holds 1 item (27 per chest). No "stacks".
+        q.chests = n / kSlotsPerChest;
+        q.items = n % kSlotsPerChest;
+        return q;
+    }
+
+    const int items_per_chest = stack_size * kSlotsPerChest;
+    q.chests = n / items_per_chest;
+    n %= items_per_chest;
+    q.stacks = n / stack_size;
+    q.items = n % stack_size;
     return q;
 }
 
@@ -43,11 +57,11 @@ std::string format_css(const CssQty& q) {
     return oss.str();
 }
 
-std::string format_quantity(int value, QuantityFormat format) {
+std::string format_quantity(int value, QuantityFormat format, const std::string& item_name) {
     if (format == QuantityFormat::Raw) {
         return std::to_string(value);
     }
-    return format_css(to_css(value));
+    return format_css(to_css(value, max_stack_size(item_name)));
 }
 
 int quantity_for(const MaterialItem& item, QuantityColumn column) {

@@ -68,7 +68,7 @@ If the open file changes on disk while the app is running, the status bar prompt
 ### Quantity format
 
 - `raw` — plain item counts
-- `css` — chests/stacks/items (`5c+5s+10` for 8970 items; 64 per stack, 27 stacks per chest)
+- `css` — chests/stacks/items, using each item's real max stack size from Java Edition (`5c+5s+10` for 8970 of a 64-stack item; signs/eggs/etc. use 16 per stack; unstackable items use chest slots of 27 with no `s` component)
 
 ### Groups
 

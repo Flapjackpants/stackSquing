@@ -10,11 +10,11 @@ struct CssQty {
     int items = 0;
 };
 
-constexpr int kItemsPerStack = 64;
-constexpr int kStacksPerChest = 27;
-constexpr int kItemsPerChest = kItemsPerStack * kStacksPerChest;
+constexpr int kDefaultItemsPerStack = 64;
+constexpr int kSlotsPerChest = 27;
 
-CssQty to_css(int n);
+CssQty to_css(int n, int stack_size = kDefaultItemsPerStack);
 std::string format_css(const CssQty& q);
-std::string format_quantity(int value, QuantityFormat format);
+// item_name selects stack size (1 / 16 / 64) for css formatting.
+std::string format_quantity(int value, QuantityFormat format, const std::string& item_name = {});
 int quantity_for(const MaterialItem& item, QuantityColumn column);

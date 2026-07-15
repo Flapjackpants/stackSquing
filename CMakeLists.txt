@@ -11,6 +11,7 @@ add_executable(stackSquing
     src/main.cpp
     src/parser.cpp
     src/format.cpp
+    src/stack_size.cpp
     src/groups.cpp
     src/display_order.cpp
     src/paths.cpp

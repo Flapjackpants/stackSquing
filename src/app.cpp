@@ -114,7 +114,7 @@ std::vector<std::string> App::build_help_text() {
         "",
         "Quantity format:",
         "  raw                   Plain item counts",
-        "  css                   Chests/stacks/items (e.g. 5c+5s+10)",
+        "  css                   Chests/stacks/items (per-item stack size: 64/16/1)",
         "",
         "Groups:",
         "  groups                List saved groups and on/off state",

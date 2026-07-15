@@ -347,7 +347,7 @@ void NcursesRenderer::draw(const MaterialList& list,
                 continue;
             }
 
-            const std::string qty = format_quantity(row.quantity, settings.format);
+            const std::string qty = format_quantity(row.quantity, settings.format, row.label);
             const bool use_dots = (row.display_number % 2) != 0;
             std::ostringstream line;
 
