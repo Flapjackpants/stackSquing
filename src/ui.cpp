@@ -125,6 +125,39 @@ std::string enabled_group_names(const GroupStore& groups) {
     return oss.str();
 }
 
+// TOC-style leader: "Label ................ 3s+50" (or spaces when use_dots is false)
+std::string with_leader_dots(const std::string& label, const std::string& quantity, int width,
+                             bool use_dots) {
+    if (width <= 0) {
+        return "";
+    }
+    if (static_cast<int>(quantity.size()) >= width) {
+        return quantity.substr(quantity.size() - static_cast<size_t>(width));
+    }
+
+    const int min_gap = 2;  // " ." or "  " at least
+    int label_budget = width - static_cast<int>(quantity.size()) - min_gap;
+    if (label_budget < 1) {
+        label_budget = 1;
+    }
+
+    std::string left = label;
+    if (static_cast<int>(left.size()) > label_budget) {
+        if (label_budget <= 1) {
+            left = left.substr(0, static_cast<size_t>(label_budget));
+        } else {
+            left = left.substr(0, static_cast<size_t>(label_budget - 3)) + "...";
+        }
+    }
+
+    const int gap = width - static_cast<int>(left.size()) - static_cast<int>(quantity.size()) - 2;
+    if (gap < 1) {
+        return left + " " + quantity;
+    }
+    const char fill = use_dots ? '.' : ' ';
+    return left + " " + std::string(static_cast<size_t>(gap), fill) + " " + quantity;
+}
+
 }  // namespace
 
 NcursesRenderer::NcursesRenderer() = default;
@@ -238,6 +271,13 @@ void NcursesRenderer::draw(const MaterialList& list,
     } else {
         title << "Material List";
     }
+    const auto slash = list.file_path.find_last_of("/\\");
+    const std::string filename = (slash == std::string::npos)
+                                     ? list.file_path
+                                     : list.file_path.substr(slash + 1);
+    if (!filename.empty()) {
+        title << "  [" << filename << "]";
+    }
     draw_box_row(y++, width, title.str());
 
     std::ostringstream meta;
@@ -271,19 +311,18 @@ void NcursesRenderer::draw(const MaterialList& list,
             draw_box_row(table_top + 2 + i, width, help_lines[row_idx]);
         }
     } else {
+        const int leader_width = name_width + 3 + qty_width;
+
         std::ostringstream header;
         header << " " << std::setw(num_width - 1) << "#"
-               << " | " << std::left << std::setw(name_width) << "Item"
-               << " | " << std::right << std::setw(qty_width) << "Qty"
+               << " | " << with_leader_dots("Item", "Qty", leader_width, true)
                << " | " << std::left << std::setw(status_width) << "Status";
         draw_box_row(y++, width, header.str());
 
         std::string divider;
         divider.append(num_width, '-');
         divider += "-+-";
-        divider.append(name_width, '-');
-        divider += "-+-";
-        divider.append(qty_width, '-');
+        divider.append(leader_width, '-');
         divider += "-+-";
         divider.append(status_width, '-');
         draw_box_row(y++, width, divider);
@@ -302,18 +341,20 @@ void NcursesRenderer::draw(const MaterialList& list,
 
             if (row.kind == DisplayRowKind::Separator) {
                 attron(COLOR_PAIR(4) | A_DIM);
-                draw_box_row(row_y, width, std::string(name_width + num_width + qty_width + status_width + 6, '-'));
+                draw_box_row(row_y, width,
+                             std::string(num_width + leader_width + status_width + 6, '-'));
                 attroff(COLOR_PAIR(4) | A_DIM);
                 continue;
             }
 
+            const std::string qty = format_quantity(row.quantity, settings.format);
+            const bool use_dots = (row.display_number % 2) != 0;
             std::ostringstream line;
+
             if (row.kind == DisplayRowKind::SupergroupHeader) {
+                const std::string label = "<<" + row.label + ">>";
                 line << "S" << std::setw(num_width - 1) << row.display_number
-                     << " | <<" << truncate(row.label, name_width - 4) << ">>"
-                     << std::string(std::max(0, name_width - 4 - static_cast<int>(row.label.size())), ' ')
-                     << " | " << std::right << std::setw(qty_width)
-                     << format_quantity(row.quantity, settings.format)
+                     << " | " << with_leader_dots(label, qty, leader_width, use_dots)
                      << " | ";
                 attron(COLOR_PAIR(1) | A_BOLD);
                 draw_box_row(row_y, width, line.str());
@@ -321,11 +362,9 @@ void NcursesRenderer::draw(const MaterialList& list,
                 continue;
             }
             if (row.kind == DisplayRowKind::GroupHeader) {
+                const std::string label = "[" + row.label + "]";
                 line << "G" << std::setw(num_width - 1) << row.display_number
-                     << " | [" << truncate(row.label, name_width - 2) << "]"
-                     << std::string(std::max(0, name_width - 2 - static_cast<int>(row.label.size())), ' ')
-                     << " | " << std::right << std::setw(qty_width)
-                     << format_quantity(row.quantity, settings.format)
+                     << " | " << with_leader_dots(label, qty, leader_width, use_dots)
                      << " | ";
                 attron(COLOR_PAIR(2) | A_BOLD);
                 draw_box_row(row_y, width, line.str());
@@ -349,9 +388,7 @@ void NcursesRenderer::draw(const MaterialList& list,
             }
 
             line << " " << std::setw(num_width - 1) << row.display_number
-                 << " | " << std::left << std::setw(name_width) << truncate(display_name, name_width)
-                 << " | " << std::right << std::setw(qty_width)
-                 << format_quantity(row.quantity, settings.format)
+                 << " | " << with_leader_dots(display_name, qty, leader_width, use_dots)
                  << " | " << std::left << std::setw(status_width)
                  << (row.fulfilled ? "fulfilled" : "");
 

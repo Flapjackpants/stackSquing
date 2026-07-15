@@ -2,13 +2,28 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
 #include <sstream>
 #include <vector>
 
 #include "display_order.hpp"
 #include "parser.hpp"
+#include "paths.hpp"
 
 namespace {
+
+std::vector<std::string> read_file_lines(const std::string& path) {
+    std::ifstream in(path);
+    std::vector<std::string> lines;
+    if (!in) {
+        return lines;
+    }
+    std::string line;
+    while (std::getline(in, line)) {
+        lines.push_back(line);
+    }
+    return lines;
+}
 
 std::string trim(const std::string& s) {
     size_t start = 0;
@@ -162,7 +177,10 @@ std::vector<std::string> App::build_help_text() {
         "  Delete (typing)       Delete character after cursor",
         "",
         "Other:",
-        "  reload                Re-read the material list from disk",
+        "  reload                Re-read current file, or newer material_list_*.txt",
+        "                        in the same folder (Litematica timestamped exports)",
+        "  latest                Load the newest material_list_*.txt in the same folder",
+        "  open <path>           Open a material list file or directory",
         "  help                  Show this help screen",
         "  quit, q, exit         Exit stackSquing",
     };
@@ -170,9 +188,49 @@ std::vector<std::string> App::build_help_text() {
 
 App::App(std::string file_path) : file_path_(std::move(file_path)) {}
 
+void App::remember_disk_snapshot() {
+    disk_snapshot_ = list_.raw_lines;
+}
+
+bool App::file_externally_changed() const {
+    return read_file_lines(file_path_) != disk_snapshot_;
+}
+
+bool App::load_list_from_path(const std::string& path, std::string* error_out) {
+    try {
+        const std::string resolved = resolve_material_list_path(path);
+        list_ = MaterialListParser::load(resolved);
+        file_path_ = resolved;
+        remember_disk_snapshot();
+        scroll_offset_ = 0;
+        return true;
+    } catch (const std::exception& ex) {
+        if (error_out != nullptr) {
+            *error_out = ex.what();
+        }
+        return false;
+    }
+}
+
+std::string App::reload_status_message(bool switched_file) const {
+    std::ostringstream oss;
+    if (switched_file) {
+        oss << "Loaded newer export: " << path_basename(file_path_);
+    } else {
+        oss << "Reloaded " << path_basename(file_path_);
+    }
+    oss << " (" << list_.items.size() << " items";
+    if (!list_.placement_name.empty()) {
+        oss << ", " << list_.placement_name;
+    }
+    oss << ").";
+    return oss.str();
+}
+
 int App::run() {
     try {
         list_ = MaterialListParser::load(file_path_);
+        remember_disk_snapshot();
     } catch (const std::exception& ex) {
         fprintf(stderr, "Error: %s\n", ex.what());
         return 1;
@@ -187,6 +245,7 @@ int App::run() {
         return 1;
     }
 
+    status_message_ = "Loaded " + path_basename(file_path_) + ".";
     rebuild_and_draw();
 
     while (!ui_.should_quit()) {
@@ -212,12 +271,21 @@ int App::run() {
 }
 
 void App::rebuild_and_draw() {
+    if (file_externally_changed()) {
+        status_message_ =
+            "File changed on disk. Type reload (or latest for a newer export).";
+    }
     const auto rows =
         DisplayOrderBuilder::build(list_, groups_, settings_.column, settings_.hide_fulfilled_groups);
     ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_);
 }
 
 bool App::fulfill_display_number(int display_number, bool fulfilled) {
+    if (file_externally_changed()) {
+        status_message_ = "File changed on disk. Run reload before fulfilling.";
+        return false;
+    }
+
     const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column,
                                                  settings_.hide_fulfilled_groups);
     const DisplayRow* row = nullptr;
@@ -235,6 +303,7 @@ bool App::fulfill_display_number(int display_number, bool fulfilled) {
     try {
         MaterialListParser::set_fulfilled(list_, row->item_index, fulfilled);
         MaterialListParser::save(list_);
+        remember_disk_snapshot();
         status_message_ = fulfilled ? "Marked item fulfilled." : "Removed fulfillment.";
         return true;
     } catch (const std::exception& ex) {
@@ -314,11 +383,57 @@ bool App::handle_command(const std::string& command) {
         return true;
     }
     if (cmd == "reload") {
-        try {
-            list_ = MaterialListParser::load(file_path_);
-            status_message_ = "Reloaded material list.";
-        } catch (const std::exception& ex) {
-            status_message_ = ex.what();
+        const std::string previous_path = file_path_;
+        const std::string dir = parent_directory(file_path_);
+        const std::string newest = newest_material_list_in_dir(dir);
+        const std::string target =
+            (!newest.empty() && newest != file_path_) ? newest : file_path_;
+
+        std::string error;
+        if (load_list_from_path(target, &error)) {
+            status_message_ = reload_status_message(target != previous_path);
+        } else {
+            status_message_ = error.empty() ? "Failed to reload material list." : error;
+        }
+        return true;
+    }
+    if (cmd == "latest") {
+        const std::string dir = parent_directory(file_path_);
+        const std::string newest = newest_material_list_in_dir(dir);
+        if (newest.empty()) {
+            status_message_ = "No material_list_*.txt found in " + dir;
+            return true;
+        }
+        const std::string previous_path = file_path_;
+        std::string error;
+        if (load_list_from_path(newest, &error)) {
+            if (newest == previous_path) {
+                status_message_ = reload_status_message(false);
+            } else {
+                status_message_ = reload_status_message(true);
+            }
+        } else {
+            status_message_ = error.empty() ? "Failed to load latest material list." : error;
+        }
+        return true;
+    }
+    if (cmd == "open") {
+        if (tokens.size() < 2) {
+            status_message_ = "Usage: open <material_list_file_or_directory>";
+            return true;
+        }
+        // Rejoin tokens in case the path contains spaces (unlikely but safe for absolute paths)
+        std::string path = tokens[1];
+        for (size_t i = 2; i < tokens.size(); ++i) {
+            path.push_back(' ');
+            path += tokens[i];
+        }
+        const std::string previous_path = file_path_;
+        std::string error;
+        if (load_list_from_path(path, &error)) {
+            status_message_ = reload_status_message(file_path_ != previous_path);
+        } else {
+            status_message_ = error.empty() ? "Failed to open material list." : error;
         }
         return true;
     }

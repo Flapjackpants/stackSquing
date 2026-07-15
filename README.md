@@ -44,11 +44,20 @@ Ensure `~/.local/bin` (or your install prefix) is on your `PATH`, then run:
 
 ```bash
 stackSquing /path/to/material_list.txt
+stackSquing /path/to/litematica/   # loads newest material_list_*.txt in that folder
 ```
 
 ## Usage
 
 Type `help` inside the app for a full scrollable list of commands.
+
+Litematica writes a **new timestamped file** on each export (e.g. `material_list_2026-07-14_23.17.52.txt`). The title bar shows which file is open. After exporting again:
+
+- `reload` — re-read the current file, or automatically switch to a newer `material_list_*.txt` in the same folder
+- `latest` — always load the newest `material_list_*.txt` in the same folder
+- `open <path>` — open a specific file or directory
+
+If the open file changes on disk while the app is running, the status bar prompts you to reload; fulfilling is blocked until you do, so an old in-memory list cannot overwrite a new export.
 
 ### Quantity column
 
@@ -74,7 +83,7 @@ Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `incl
 - `group remove Deepslate`
 - `group order Deepslate 0`
 
-When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`). Groups that belong to an enabled supergroup are only shown inside that supergroup, not on their own.
+When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items that are not in any enabled group appear first (above group blocks). Item names use leader dots to the quantity (table-of-contents style) so counts are easy to scan. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`). Groups that belong to an enabled supergroup are only shown inside that supergroup, not on their own.
 
 ### Supergroups
 
@@ -107,7 +116,9 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 
 ### Other
 
-- `reload` — re-read the material list from disk
+- `reload` — re-read the current file, or load a newer `material_list_*.txt` in the same folder if Litematica created one
+- `latest` — load the newest `material_list_*.txt` in the same folder
+- `open <path>` — open a material list file or directory
 - `help` — show all available commands
 - `quit` or `q` — exit
 

@@ -13,6 +13,7 @@ add_executable(stackSquing
     src/format.cpp
     src/groups.cpp
     src/display_order.cpp
+    src/paths.cpp
     src/app.cpp
     src/ui.cpp
 )

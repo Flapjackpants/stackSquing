@@ -149,6 +149,29 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
     const auto supergroup_member_names = groups_in_enabled_supergroups(groups);
     const bool any_blocks = !enabled_supergroups.empty() || !enabled_groups.empty();
 
+    bool any_ungrouped = false;
+    for (int i = 0; i < static_cast<int>(list.items.size()); ++i) {
+        if (item_in_enabled_groups(list, groups, i) || item_in_enabled_supergroups(list, groups, i)) {
+            continue;
+        }
+        const auto& item = list.items[i];
+        DisplayRow row;
+        row.kind = DisplayRowKind::Item;
+        row.display_number = item_number++;
+        row.label = item.name;
+        row.quantity = quantity_for(item, column);
+        row.item_index = i;
+        row.fulfilled = item.fulfilled;
+        rows.push_back(row);
+        any_ungrouped = true;
+    }
+
+    if (any_ungrouped && any_blocks) {
+        DisplayRow sep;
+        sep.kind = DisplayRowKind::Separator;
+        rows.push_back(sep);
+    }
+
     for (const Supergroup* supergroup : enabled_supergroups) {
         const auto unique_indices = unique_indices_for_supergroup(list, groups, *supergroup);
         if (unique_indices.empty()) {
@@ -207,21 +230,6 @@ std::vector<DisplayRow> DisplayOrderBuilder::build(const MaterialList& list,
             sep.kind = DisplayRowKind::Separator;
             rows.push_back(sep);
         }
-    }
-
-    for (int i = 0; i < static_cast<int>(list.items.size()); ++i) {
-        if (item_in_enabled_groups(list, groups, i) || item_in_enabled_supergroups(list, groups, i)) {
-            continue;
-        }
-        const auto& item = list.items[i];
-        DisplayRow row;
-        row.kind = DisplayRowKind::Item;
-        row.display_number = item_number++;
-        row.label = item.name;
-        row.quantity = quantity_for(item, column);
-        row.item_index = i;
-        row.fulfilled = item.fulfilled;
-        rows.push_back(row);
     }
 
     if (!rows.empty() && rows.back().kind == DisplayRowKind::Separator) {
