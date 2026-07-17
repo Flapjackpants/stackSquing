@@ -2,13 +2,37 @@
 
 Interactive terminal tool for Litematica ASCII material lists. View totals in raw or chest/stack/item format, organize items into filter-based groups, and mark items fulfilled (saved back to the file with an `a` suffix).
 
-## Requirements
+## Install
 
-- C++17 compiler (Clang or GCC)
+macOS, Linux, or Windows (WSL / Git Bash):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | bash
+```
+
+That downloads the source, builds it, and installs `stackSquing` to `~/.local/bin`. Make sure that directory is on your `PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Custom install location or git ref:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | INSTALL_PREFIX=/usr/local bash
+curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | STACKSQUING_REF=v1.0.0 bash
+```
+
+**Windows note:** use [WSL](https://learn.microsoft.com/windows/wsl/) (recommended) or Git Bash with CMake and a C++ toolchain. Native PowerShell/cmd is not supported (the UI needs a Unix-style terminal + ncurses).
+
+### Requirements
+
+- C++17 compiler (Clang or GCC; Xcode CLT on macOS)
 - CMake 3.16+
-- ncurses (macOS: pre-installed via Xcode CLI tools)
+- ncurses (macOS: via Xcode CLT; Linux: e.g. `sudo apt install libncurses-dev`)
+- `curl`, `tar`
 
-## Build
+## Build from a local clone
 
 ### Using build.sh (recommended)
 
@@ -40,7 +64,7 @@ Or copy the binary manually:
 cp build/stackSquing ~/.local/bin/
 ```
 
-Ensure `~/.local/bin` (or your install prefix) is on your `PATH`, then run:
+Then run:
 
 ```bash
 stackSquing /path/to/material_list.txt
