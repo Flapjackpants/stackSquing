@@ -96,12 +96,13 @@ If the open file changes on disk while the app is running, the status bar prompt
 
 ### Groups
 
-Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). `exclude` terms still disqualify a match.
+Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). Terms may contain spaces (`include:light blue,blue wool`); commas separate terms. `exclude` terms still disqualify a match.
 
 - `groups` — list saved groups and on/off state
 - `group add Deepslate include:deepslate`
 - `group edit Deepslate include:brick exclude:cracked`
 - `group add Oak include:oak exclude:dark`
+- `group add Blues include:light blue,blue wool`
 - `group on Deepslate` / `group off Deepslate`
 - `group rename Deepslate DeepslateBlocks`
 - `group remove Deepslate`
@@ -116,6 +117,7 @@ Supergroups nest matching item groups under one summary total (each item counted
 - `supergroups` — list saved supergroups and on/off state
 - `supergroup add smelting include:glass,terracotta,nether`
 - `supergroup edit wood include:oak,birch exclude:dark`
+- `supergroup add blues include:light blue`
 - `supergroup on Stone` / `supergroup off Stone`
 - `supergroup rename Stone Rock`
 - `supergroup remove Stone`
@@ -126,7 +128,9 @@ Supergroups nest matching item groups under one summary total (each item counted
 Items are numbered in display order. Mark an item fulfilled (strikes through in the UI and appends `a` to the line in the file):
 
 - `fulfill 3` or `a 3`
+- `fulfill 14-24` or `a 14-24` — mark items 14 through 24 inclusive
 - `unfulfill 3` or `u 3`
+- `unfulfill 14-24` or `u 14-24` — clear fulfillment for a range
 
 ### Navigation
 

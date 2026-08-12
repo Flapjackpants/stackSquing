@@ -34,5 +34,5 @@ private:
     std::string reload_status_message(bool switched_file) const;
     void rebuild_and_draw();
     bool handle_command(const std::string& command);
-    bool fulfill_display_number(int display_number, bool fulfilled);
+    bool fulfill_display_range(int lo, int hi, bool fulfilled);
 };

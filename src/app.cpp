@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <set>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "display_order.hpp"
@@ -74,33 +76,80 @@ void append_unique_terms(std::vector<std::string>& dest, const std::vector<std::
     }
 }
 
-bool apply_filter_tokens(std::vector<std::string>& include, std::vector<std::string>& exclude,
-                         size_t start_index, const std::vector<std::string>& tokens, bool append) {
+// Parse include:/exclude: from the raw command so spaces inside comma-separated terms are kept.
+bool apply_filter_string(std::vector<std::string>& include, std::vector<std::string>& exclude,
+                         const std::string& text, bool append) {
     bool changed = false;
-    for (size_t i = start_index; i < tokens.size(); ++i) {
-        const auto& token = tokens[i];
-        const auto include_pos = token.find("include:");
-        const auto exclude_pos = token.find("exclude:");
-        if (include_pos != std::string::npos) {
-            const auto terms = split_csv(token.substr(include_pos + 8));
+    size_t pos = 0;
+    while (pos < text.size()) {
+        const size_t inc = text.find("include:", pos);
+        const size_t exc = text.find("exclude:", pos);
+
+        size_t key_pos = std::string::npos;
+        bool is_include = false;
+        if (inc != std::string::npos && (exc == std::string::npos || inc < exc)) {
+            key_pos = inc;
+            is_include = true;
+        } else if (exc != std::string::npos) {
+            key_pos = exc;
+            is_include = false;
+        } else {
+            break;
+        }
+
+        const size_t value_start = key_pos + 8;
+        size_t value_end = text.size();
+        const size_t next_inc = text.find("include:", value_start);
+        const size_t next_exc = text.find("exclude:", value_start);
+        if (next_inc != std::string::npos) {
+            value_end = std::min(value_end, next_inc);
+        }
+        if (next_exc != std::string::npos) {
+            value_end = std::min(value_end, next_exc);
+        }
+
+        const auto terms = split_csv(text.substr(value_start, value_end - value_start));
+        if (is_include) {
             if (append) {
                 append_unique_terms(include, terms);
             } else {
                 include = terms;
             }
-            changed = true;
-        }
-        if (exclude_pos != std::string::npos) {
-            const auto terms = split_csv(token.substr(exclude_pos + 8));
+        } else {
             if (append) {
                 append_unique_terms(exclude, terms);
             } else {
                 exclude = terms;
             }
-            changed = true;
         }
+        changed = true;
+        pos = value_end;
     }
     return changed;
+}
+
+bool parse_display_range(const std::string& s, int& lo, int& hi) {
+    if (s.empty()) {
+        return false;
+    }
+    const size_t dash = s.find('-');
+    try {
+        if (dash == std::string::npos) {
+            lo = hi = std::stoi(s);
+            return true;
+        }
+        if (dash == 0 || dash + 1 >= s.size()) {
+            return false;
+        }
+        lo = std::stoi(s.substr(0, dash));
+        hi = std::stoi(s.substr(dash + 1));
+        if (lo > hi) {
+            std::swap(lo, hi);
+        }
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 }  // namespace
@@ -119,7 +168,7 @@ std::vector<std::string> App::build_help_text() {
         "Groups:",
         "  groups                List saved groups and on/off state",
         "  group add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
-        "                        (any include term matches; exclude terms disqualify)",
+        "                        (terms may contain spaces; commas separate terms)",
         "  group edit <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
         "  group on <name>       Enable a group",
         "  group off <name>      Disable a group",
@@ -130,7 +179,7 @@ std::vector<std::string> App::build_help_text() {
         "Supergroups:",
         "  supergroups             List saved supergroups and on/off state",
         "  supergroup add <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
-        "                        (matches group names; any include term matches)",
+        "                        (matches group names; terms may contain spaces)",
         "  supergroup edit <name> include:<term>[,<term>] [exclude:<term>[,<term>]]",
         "  supergroup on <name>    Enable a supergroup",
         "  supergroup off <name>   Disable a supergroup",
@@ -144,9 +193,11 @@ std::vector<std::string> App::build_help_text() {
         "",
         "Fulfillment:",
         "  fulfill <n>           Mark item n fulfilled (saves to file)",
-        "  a <n>                 Short for fulfill",
+        "  fulfill <n>-<m>       Mark items n through m inclusive",
+        "  a <n> / a <n>-<m>     Short for fulfill",
         "  unfulfill <n>         Remove fulfillment marker",
-        "  u <n>                 Short for unfulfill",
+        "  unfulfill <n>-<m>     Unfulfill a range",
+        "  u <n> / u <n>-<m>     Short for unfulfill",
         "",
         "Navigation:",
         "  up                    Scroll up",
@@ -262,7 +313,7 @@ void App::rebuild_and_draw() {
     ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_);
 }
 
-bool App::fulfill_display_number(int display_number, bool fulfilled) {
+bool App::fulfill_display_range(int lo, int hi, bool fulfilled) {
     if (file_externally_changed()) {
         status_message_ = "File changed on disk. Run reload before fulfilling.";
         return false;
@@ -270,23 +321,36 @@ bool App::fulfill_display_number(int display_number, bool fulfilled) {
 
     const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column,
                                                  settings_.hide_fulfilled_groups);
-    const DisplayRow* row = nullptr;
+    std::set<int> indices;
     for (const auto& r : rows) {
-        if (r.kind == DisplayRowKind::Item && r.display_number == display_number) {
-            row = &r;
-            break;
+        if (r.kind == DisplayRowKind::Item && r.display_number >= lo && r.display_number <= hi &&
+            r.item_index >= 0) {
+            indices.insert(r.item_index);
         }
     }
-    if (!row || row->item_index < 0) {
-        status_message_ = "Invalid item number: " + std::to_string(display_number);
+    if (indices.empty()) {
+        if (lo == hi) {
+            status_message_ = "Invalid item number: " + std::to_string(lo);
+        } else {
+            status_message_ = "No items in range " + std::to_string(lo) + "-" + std::to_string(hi);
+        }
         return false;
     }
 
     try {
-        MaterialListParser::set_fulfilled(list_, row->item_index, fulfilled);
+        for (int item_index : indices) {
+            MaterialListParser::set_fulfilled(list_, item_index, fulfilled);
+        }
         MaterialListParser::save(list_);
         remember_disk_snapshot();
-        status_message_ = fulfilled ? "Marked item fulfilled." : "Removed fulfillment.";
+        const std::string count = std::to_string(indices.size());
+        if (fulfilled) {
+            status_message_ = indices.size() == 1 ? "Marked item fulfilled."
+                                                  : "Marked " + count + " items fulfilled.";
+        } else {
+            status_message_ = indices.size() == 1 ? "Removed fulfillment."
+                                                  : "Removed fulfillment from " + count + " items.";
+        }
         return true;
     } catch (const std::exception& ex) {
         status_message_ = ex.what();
@@ -488,7 +552,7 @@ bool App::handle_command(const std::string& command) {
             group.enabled = true;
             group.order = static_cast<int>(groups_.groups().size());
 
-            if (!apply_filter_tokens(group.include, group.exclude, 3, tokens, false)) {
+            if (!apply_filter_string(group.include, group.exclude, command, false)) {
                 status_message_ = "Group add requires include:term[,term]";
                 return true;
             }
@@ -512,7 +576,7 @@ bool App::handle_command(const std::string& command) {
         }
         if (sub == "edit" && tokens.size() >= 4) {
             if (auto* group = groups_.find_group(tokens[2])) {
-                if (!apply_filter_tokens(group->include, group->exclude, 3, tokens, true)) {
+                if (!apply_filter_string(group->include, group->exclude, command, true)) {
                     status_message_ = "Group edit requires include:term[,term] and/or exclude:term[,term]";
                     return true;
                 }
@@ -594,7 +658,7 @@ bool App::handle_command(const std::string& command) {
             supergroup.enabled = true;
             supergroup.order = static_cast<int>(groups_.supergroups().size());
 
-            if (!apply_filter_tokens(supergroup.include, supergroup.exclude, 3, tokens, false) ||
+            if (!apply_filter_string(supergroup.include, supergroup.exclude, command, false) ||
                 supergroup.include.empty()) {
                 status_message_ = "Supergroup add requires include:term[,term]";
                 return true;
@@ -614,7 +678,7 @@ bool App::handle_command(const std::string& command) {
         }
         if (sub == "edit" && tokens.size() >= 4) {
             if (auto* supergroup = groups_.find_supergroup(tokens[2])) {
-                if (!apply_filter_tokens(supergroup->include, supergroup->exclude, 3, tokens, true)) {
+                if (!apply_filter_string(supergroup->include, supergroup->exclude, command, true)) {
                     status_message_ = "Supergroup edit requires include:term[,term] and/or exclude:term[,term]";
                     return true;
                 }
@@ -650,11 +714,23 @@ bool App::handle_command(const std::string& command) {
         return true;
     }
     if ((cmd == "fulfill" || cmd == "a") && tokens.size() >= 2) {
-        fulfill_display_number(std::stoi(tokens[1]), true);
+        int lo = 0;
+        int hi = 0;
+        if (!parse_display_range(tokens[1], lo, hi)) {
+            status_message_ = "Usage: fulfill <n> or fulfill <n>-<m>";
+            return true;
+        }
+        fulfill_display_range(lo, hi, true);
         return true;
     }
     if ((cmd == "unfulfill" || cmd == "u") && tokens.size() >= 2) {
-        fulfill_display_number(std::stoi(tokens[1]), false);
+        int lo = 0;
+        int hi = 0;
+        if (!parse_display_range(tokens[1], lo, hi)) {
+            status_message_ = "Usage: unfulfill <n> or unfulfill <n>-<m>";
+            return true;
+        }
+        fulfill_display_range(lo, hi, false);
         return true;
     }
 
