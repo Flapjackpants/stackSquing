@@ -160,6 +160,7 @@ std::vector<std::string> App::build_help_text() {
         "  total                 Show Total column",
         "  missing               Show Missing column (default)",
         "  available             Show Available column",
+        "  need                  Show still need (missing − available)",
         "",
         "Quantity format:",
         "  raw                   Plain item counts",
@@ -392,6 +393,11 @@ bool App::handle_command(const std::string& command) {
     if (cmd == "available") {
         settings_.column = QuantityColumn::Available;
         status_message_ = "Showing available column.";
+        return true;
+    }
+    if (cmd == "need") {
+        settings_.column = QuantityColumn::Need;
+        status_message_ = "Showing need column (missing − available).";
         return true;
     }
     if (cmd == "raw") {

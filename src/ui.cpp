@@ -88,6 +88,8 @@ std::string column_label(QuantityColumn column) {
             return "missing";
         case QuantityColumn::Available:
             return "available";
+        case QuantityColumn::Need:
+            return "need";
     }
     return "missing";
 }

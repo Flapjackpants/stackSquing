@@ -88,6 +88,7 @@ If the open file changes on disk while the app is running, the status bar prompt
 - `total` — show Total column
 - `missing` — show Missing column (default)
 - `available` — show Available column
+- `need` — show still need after inventory (`max(0, missing − available)`)
 
 ### Quantity format
 

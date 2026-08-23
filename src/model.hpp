@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-enum class QuantityColumn { Total, Missing, Available };
+enum class QuantityColumn { Total, Missing, Available, Need };
 enum class QuantityFormat { Raw, Css };
 
 struct MaterialItem {

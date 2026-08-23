@@ -1,5 +1,6 @@
 #include "format.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 
@@ -72,6 +73,8 @@ int quantity_for(const MaterialItem& item, QuantityColumn column) {
             return item.missing;
         case QuantityColumn::Available:
             return item.available;
+        case QuantityColumn::Need:
+            return std::max(0, item.missing - item.available);
     }
     return item.missing;
 }
