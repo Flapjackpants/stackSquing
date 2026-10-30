@@ -97,7 +97,7 @@ If the open file changes on disk while the app is running, the status bar prompt
 
 ### Groups
 
-Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). Terms may contain spaces (`include:light blue,blue wool`); commas separate terms. `exclude` terms still disqualify a match.
+Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). Terms may contain spaces (`include:light blue,blue wool`); commas separate terms. `exclude` terms still disqualify a match, unless a longer matching include term contains the exclude term (e.g. `include:light blue exclude:light` keeps Light Blue Wool).
 
 - `groups` — list saved groups and on/off state
 - `group add Deepslate include:deepslate`

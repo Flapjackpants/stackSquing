@@ -53,19 +53,30 @@ bool matches_filter(const std::vector<std::string>& include, const std::vector<s
     }
 
     const auto lower_name = to_lower(text);
-    bool matched_include = false;
+    std::vector<std::string> matched_includes;
     for (const auto& term : include) {
-        if (lower_name.find(to_lower(term)) != std::string::npos) {
-            matched_include = true;
-            break;
+        auto lower_term = to_lower(term);
+        if (lower_name.find(lower_term) != std::string::npos) {
+            matched_includes.push_back(std::move(lower_term));
         }
     }
-    if (!matched_include) {
+    if (matched_includes.empty()) {
         return false;
     }
 
     for (const auto& term : exclude) {
-        if (lower_name.find(to_lower(term)) != std::string::npos) {
+        const auto lower_exc = to_lower(term);
+        if (lower_name.find(lower_exc) == std::string::npos) {
+            continue;
+        }
+        bool overridden = false;
+        for (const auto& inc : matched_includes) {
+            if (inc.size() > lower_exc.size() && inc.find(lower_exc) != std::string::npos) {
+                overridden = true;
+                break;
+            }
+        }
+        if (!overridden) {
             return false;
         }
     }

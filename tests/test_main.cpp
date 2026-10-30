@@ -116,6 +116,35 @@ void test_overview_group_in_supergroup() {
     CHECK(contains(out, "      in: smelting"));
 }
 
+void test_matches_specific_include_beats_exclude() {
+    GroupStore store;
+    ItemGroup g = make_group("Light", {"light", "blue", "light blue"}, {"light", "gray"});
+    CHECK(store.matches(g, "Light Blue Wool"));
+    CHECK(!store.matches(g, "Light Gray Wool"));
+    CHECK(!store.matches(g, "Light Weighted Pressure Plate"));
+}
+
+void test_matches_exclude_still_applies() {
+    GroupStore store;
+    ItemGroup stone = make_group("Stone", {"stone"}, {"blackstone"});
+    CHECK(!store.matches(stone, "Blackstone"));
+    CHECK(store.matches(stone, "Stone Bricks"));
+    ItemGroup same = make_group("Light", {"light"}, {"light"});
+    CHECK(!store.matches(same, "Light Blue Wool"));
+}
+
+void test_matches_specific_include_case_insensitive() {
+    GroupStore store;
+    ItemGroup g = make_group("Light", {"Light Blue"}, {"LIGHT"});
+    CHECK(store.matches(g, "light blue wool"));
+}
+
+void test_matches_supergroup_specific_include() {
+    GroupStore store;
+    Supergroup s = make_super("blues", {"light blue"}, {"light"});
+    CHECK(store.matches(s, "light blue wool"));
+}
+
 void test_classify_status_errors() {
     for (const char* m : {"Usage: open <x>", "Group not found: x", "Group already exists: x",
                           "Unknown command. Type help.", "Group add requires include:term[,term]",
@@ -191,6 +220,10 @@ int main() {
     test_overview_supergroup_members();
     test_overview_supergroup_no_members();
     test_overview_group_in_supergroup();
+    test_matches_specific_include_beats_exclude();
+    test_matches_exclude_still_applies();
+    test_matches_specific_include_case_insensitive();
+    test_matches_supergroup_specific_include();
     if (g_failures > 0) {
         std::cerr << g_failures << " failures" << std::endl;
         return 1;
