@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "display_order.hpp"
+#include "overview.hpp"
 #include "parser.hpp"
 #include "paths.hpp"
 
@@ -189,6 +190,7 @@ std::vector<std::string> App::build_help_text() {
         "  supergroup order <name> <n> Set supergroup display order",
         "",
         "Display:",
+        "  overview              Show all groups and supergroups (no items)",
         "  hidefulfilled on      Hide groups when all items fulfilled (default)",
         "  hidefulfilled off     Keep showing fully fulfilled groups",
         "",
@@ -311,7 +313,7 @@ void App::rebuild_and_draw() {
     }
     const auto rows =
         DisplayOrderBuilder::build(list_, groups_, settings_.column, settings_.hide_fulfilled_groups);
-    ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_);
+    ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_, panel_title_);
 }
 
 bool App::fulfill_display_range(int lo, int hi, bool fulfilled) {
@@ -367,7 +369,7 @@ bool App::handle_command(const std::string& command) {
 
     const std::string& cmd = tokens[0];
 
-    if (cmd != "help" && cmd != "up" && cmd != "down" && !help_lines_.empty()) {
+    if (cmd != "help" && cmd != "overview" && cmd != "up" && cmd != "down" && !help_lines_.empty()) {
         help_lines_.clear();
     }
 
@@ -376,8 +378,17 @@ bool App::handle_command(const std::string& command) {
     }
     if (cmd == "help") {
         help_lines_ = build_help_text();
+        panel_title_ = "Help";
         scroll_offset_ = 0;
         status_message_ = "Showing help. Use up/down to scroll.";
+        return true;
+    }
+
+    if (cmd == "overview") {
+        help_lines_ = build_group_overview(groups_);
+        panel_title_ = "Group overview";
+        scroll_offset_ = 0;
+        status_message_ = "Showing group overview. Use up/down to scroll.";
         return true;
     }
     if (cmd == "total") {

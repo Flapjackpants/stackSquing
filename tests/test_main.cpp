@@ -1,0 +1,131 @@
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include "overview.hpp"
+
+static int g_failures = 0;
+
+#define CHECK(cond)                                                              \
+    do {                                                                         \
+        if (!(cond)) {                                                           \
+            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK failed: " #cond \
+                      << std::endl;                                              \
+            ++g_failures;                                                        \
+        }                                                                        \
+    } while (0)
+
+static void print_value(const std::string& s) { std::cerr << "  \"" << s << "\"\n"; }
+static void print_value(const std::vector<std::string>& v) {
+    for (const auto& s : v) {
+        std::cerr << "  \"" << s << "\"\n";
+    }
+}
+
+#define CHECK_EQ(a, b)                                                             \
+    do {                                                                           \
+        if (!((a) == (b))) {                                                       \
+            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK failed: " #a      \
+                      << " == " #b << "\n";                                        \
+            std::cerr << " lhs:\n";                                                \
+            print_value(a);                                                        \
+            std::cerr << " rhs:\n";                                                \
+            print_value(b);                                                        \
+            ++g_failures;                                                          \
+        }                                                                          \
+    } while (0)
+
+using Lines = std::vector<std::string>;
+
+static ItemGroup make_group(const std::string& name, Lines include, Lines exclude = {}, bool enabled = true) {
+    ItemGroup g;
+    g.name = name;
+    g.include = std::move(include);
+    g.exclude = std::move(exclude);
+    g.enabled = enabled;
+    return g;
+}
+
+static Supergroup make_super(const std::string& name, Lines include, Lines exclude = {}, bool enabled = true) {
+    Supergroup s;
+    s.name = name;
+    s.include = std::move(include);
+    s.exclude = std::move(exclude);
+    s.enabled = enabled;
+    return s;
+}
+
+static bool contains(const Lines& v, const std::string& s) {
+    for (const auto& x : v) {
+        if (x == s) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void test_overview_empty() {
+    GroupStore store;
+    Lines expected = {"Supergroups (0):", "  No saved supergroups.", "", "Groups (0):", "  No saved groups."};
+    CHECK_EQ(build_group_overview(store), expected);
+}
+
+void test_overview_group_basic() {
+    GroupStore store;
+    store.groups().push_back(make_group("Oak", {"oak"}));
+    store.groups().push_back(make_group("Empty", {}, {}, false));
+    Lines out = build_group_overview(store);
+    Lines expected = {"Supergroups (0):", "  No saved supergroups.", "", "Groups (2):",
+                      "  Oak [on]", "      include: oak",
+                      "  Empty [off]", "      include: (none)"};
+    CHECK_EQ(out, expected);
+}
+
+void test_overview_group_filters() {
+    GroupStore store;
+    store.groups().push_back(make_group("Wood", {"oak", "birch"}, {"dark"}));
+    Lines out = build_group_overview(store);
+    CHECK(contains(out, "      include: oak, birch"));
+    CHECK(contains(out, "      exclude: dark"));
+}
+
+void test_overview_supergroup_members() {
+    GroupStore store;
+    store.groups().push_back(make_group("Glass", {"glass"}, {}, true));
+    store.groups().push_back(make_group("Glazed", {"glazed"}, {}, false));
+    store.supergroups().push_back(make_super("smelting", {"gla"}));
+    Lines out = build_group_overview(store);
+    CHECK(contains(out, "  smelting [on]"));
+    CHECK(contains(out, "      groups: Glass [on], Glazed [off]"));
+}
+
+void test_overview_supergroup_no_members() {
+    GroupStore store;
+    store.groups().push_back(make_group("Oak", {"oak"}));
+    store.supergroups().push_back(make_super("metals", {"iron"}));
+    Lines out = build_group_overview(store);
+    CHECK(contains(out, "      groups: none"));
+}
+
+void test_overview_group_in_supergroup() {
+    GroupStore store;
+    store.groups().push_back(make_group("Glass", {"glass"}));
+    store.supergroups().push_back(make_super("smelting", {"glass"}));
+    Lines out = build_group_overview(store);
+    CHECK(contains(out, "      in: smelting"));
+}
+
+int main() {
+    test_overview_empty();
+    test_overview_group_basic();
+    test_overview_group_filters();
+    test_overview_supergroup_members();
+    test_overview_supergroup_no_members();
+    test_overview_group_in_supergroup();
+    if (g_failures > 0) {
+        std::cerr << g_failures << " failures" << std::endl;
+        return 1;
+    }
+    std::cout << "all tests passed" << std::endl;
+    return 0;
+}

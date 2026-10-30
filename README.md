@@ -135,11 +135,12 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 
 ### Navigation
 
-- `up` / `down` — scroll the material list or help screen
+- `up` / `down` — scroll the material list, help, or overview screen
 - Arrow keys while typing — move cursor, browse command history (up/down), toggle insert/overwrite (Insert), delete forward (Delete)
 
 ### Display
 
+- `overview` — show every saved supergroup and group (on/off state, include/exclude terms, membership) without any items; `up`/`down` scroll, any other command returns to the list
 - `hidefulfilled on` — hide groups/supergroups when all their items are fulfilled (default)
 - `hidefulfilled off` — keep showing fully fulfilled groups
 

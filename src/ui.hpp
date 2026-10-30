@@ -25,7 +25,8 @@ public:
               const std::string& input_line,
               const std::string& status_message,
               int scroll_offset,
-              const std::vector<std::string>& help_lines = {});
+              const std::vector<std::string>& help_lines = {},
+              const std::string& panel_title = "Help");
 
     std::string read_line(std::vector<std::string>& command_history);
     bool should_quit() const { return should_quit_; }

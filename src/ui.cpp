@@ -238,7 +238,8 @@ void NcursesRenderer::draw(const MaterialList& list,
                            const std::string& input_line,
                            const std::string& status_message,
                            int scroll_offset,
-                           const std::vector<std::string>& help_lines) {
+                           const std::vector<std::string>& help_lines,
+                           const std::string& panel_title) {
     handle_resize();
     clear();
 
@@ -298,7 +299,7 @@ void NcursesRenderer::draw(const MaterialList& list,
     const bool showing_help = !help_lines.empty();
 
     if (showing_help) {
-        draw_box_row(y++, width, "Help");
+        draw_box_row(y++, width, panel_title);
         draw_box_row(y++, width, std::string(width - 4, '-'));
 
         const int total_rows = static_cast<int>(help_lines.size());
