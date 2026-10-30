@@ -161,6 +161,23 @@ Partial fulfillment subtracts an amount from the Missing (and Need) column and w
 - `help` — show all available commands
 - `quit` or `q` — exit
 
+## Minecraft mod (Fabric 26.3)
+
+The `fabric/` folder contains a client-only Fabric mod that shows the same material lists as a book and quill, with the full command set.
+
+**Requirements:** Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API, and optionally Mod Menu.
+
+**Build:** `cd fabric && ./gradlew build`, then copy `fabric/build/libs/stacksquing-1.0.0.jar` into `.minecraft/mods`.
+
+**Use:**
+
+- Press `B` (rebindable under Controls -> stackSquing) to open the book. No book item is needed.
+- Type commands on the bottom row. They are the same as the CLI, plus `files` and `open <n>`.
+- PageUp/PageDown and the mouse wheel scroll. Up/Down recall history. Esc or `q` closes the book.
+- Long item names scroll.
+
+**Settings (Mod Menu):** list folder (default `.minecraft/config/litematica`), groups file (default `~/.config/stackSquing/groups.json`, shared with the CLI), quantity column and format, hide fulfilled groups, single page or two-page spread (falls back to single page on narrow windows), and per-group and per-supergroup on/off. The book follows the vanilla GUI scale setting. Column, format and layout changed with book commands are saved too.
+
 ## Example
 
 ```bash

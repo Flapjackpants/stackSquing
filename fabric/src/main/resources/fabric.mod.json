@@ -7,7 +7,11 @@
   "authors": ["Maxwell Li"],
   "environment": "client",
   "entrypoints": {
-    "client": ["com.flapjackpants.stacksquing.client.StackSquingClient"]
+    "client": ["com.flapjackpants.stacksquing.client.StackSquingClient"],
+    "modmenu": ["com.flapjackpants.stacksquing.client.ModMenuIntegration"]
+  },
+  "suggests": {
+    "modmenu": "*"
   },
   "depends": {
     "fabricloader": ">=0.20.1",
