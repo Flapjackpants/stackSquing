@@ -36,4 +36,5 @@ private:
     void rebuild_and_draw();
     bool handle_command(const std::string& command);
     bool fulfill_display_range(int lo, int hi, bool fulfilled);
+    bool partial_fulfill_display_item(int display_number, const std::string& amount_text, bool add);
 };

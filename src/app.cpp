@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "display_order.hpp"
+#include "format.hpp"
 #include "overview.hpp"
 #include "parser.hpp"
 #include "paths.hpp"
+#include "stack_size.hpp"
 
 namespace {
 
@@ -198,9 +200,11 @@ std::vector<std::string> App::build_help_text() {
         "  fulfill <n>                     Mark item n fulfilled (saves to file)",
         "  fulfill <n>-<m>                 Mark items n through m inclusive",
         "  a <n> / a <n>-<m>               Short for fulfill",
+        "  a <n>, <amount>                 Fulfil part of item n (e.g. a 4, 450 or a 4, 2s+3)",
         "  unfulfill <n>                   Remove fulfillment marker",
         "  unfulfill <n>-<m>               Unfulfill a range",
         "  u <n> / u <n>-<m>               Short for unfulfill",
+        "  u <n>, <amount>                 Un-add part of item n's fulfilled amount",
         "",
         "Navigation:",
         "  up                              Scroll up",
@@ -372,6 +376,60 @@ bool App::fulfill_display_range(int lo, int hi, bool fulfilled) {
         } else {
             status_message_ = indices.size() == 1 ? "Removed fulfillment."
                                                   : "Removed fulfillment from " + count + " items.";
+        }
+        return true;
+    } catch (const std::exception& ex) {
+        status_message_ = ex.what();
+        return false;
+    }
+}
+
+bool App::partial_fulfill_display_item(int display_number, const std::string& amount_text, bool add) {
+    if (file_externally_changed()) {
+        status_message_ = "File changed on disk. Run reload before fulfilling.";
+        return false;
+    }
+
+    const auto rows = DisplayOrderBuilder::build(list_, groups_, settings_.column,
+                                                 settings_.hide_fulfilled_groups);
+    int idx = -1;
+    for (const auto& r : rows) {
+        if (r.kind == DisplayRowKind::Item && r.display_number == display_number &&
+            r.item_index >= 0) {
+            idx = r.item_index;
+            break;
+        }
+    }
+    if (idx < 0) {
+        status_message_ = "Invalid item number: " + std::to_string(display_number);
+        return false;
+    }
+
+    const MaterialItem& before = list_.items[static_cast<size_t>(idx)];
+    int amount = 0;
+    if (!parse_amount(amount_text, max_stack_size(before.name), amount)) {
+        status_message_ = add ? "Usage: a <n>, <amount> (e.g. a 4, 450 or a 4, 2s+3)"
+                              : "Usage: u <n>, <amount> (e.g. u 4, 450 or u 4, 2s+3)";
+        return false;
+    }
+
+    try {
+        const long long current = before.fulfilled ? before.missing : before.partial;
+        long long next = add ? current + amount : current - amount;
+        next = std::max<long long>(0, std::min<long long>(next, before.missing));
+        MaterialListParser::set_partial(list_, idx, static_cast<int>(next));
+        MaterialListParser::save(list_);
+        remember_disk_snapshot();
+
+        const MaterialItem& item = list_.items[static_cast<size_t>(idx)];
+        if (item.fulfilled) {
+            status_message_ = "Marked " + item.name + " fulfilled.";
+        } else if (item.partial == 0) {
+            status_message_ = "Cleared partial fulfillment of " + item.name + ".";
+        } else {
+            status_message_ = item.name + ": " +
+                              format_quantity(item.missing - item.partial, settings_.format, item.name) +
+                              " left.";
         }
         return true;
     } catch (const std::exception& ex) {
@@ -750,6 +808,27 @@ bool App::handle_command(const std::string& command) {
         return true;
     }
     if ((cmd == "fulfill" || cmd == "a") && tokens.size() >= 2) {
+        std::string rest;
+        for (size_t i = 1; i < tokens.size(); ++i) {
+            if (i > 1) {
+                rest += ' ';
+            }
+            rest += tokens[i];
+        }
+        const size_t comma = rest.find(',');
+        if (comma != std::string::npos) {
+            const std::string left = trim(rest.substr(0, comma));
+            const std::string right = trim(rest.substr(comma + 1));
+            int lo = 0;
+            int hi = 0;
+            if (left.find('-') != std::string::npos || !parse_display_range(left, lo, hi) ||
+                right.empty()) {
+                status_message_ = "Usage: a <n>, <amount> (e.g. a 4, 450 or a 4, 2s+3)";
+                return true;
+            }
+            partial_fulfill_display_item(lo, right, /*add=*/true);
+            return true;
+        }
         int lo = 0;
         int hi = 0;
         if (!parse_display_range(tokens[1], lo, hi)) {
@@ -760,6 +839,27 @@ bool App::handle_command(const std::string& command) {
         return true;
     }
     if ((cmd == "unfulfill" || cmd == "u") && tokens.size() >= 2) {
+        std::string rest;
+        for (size_t i = 1; i < tokens.size(); ++i) {
+            if (i > 1) {
+                rest += ' ';
+            }
+            rest += tokens[i];
+        }
+        const size_t comma = rest.find(',');
+        if (comma != std::string::npos) {
+            const std::string left = trim(rest.substr(0, comma));
+            const std::string right = trim(rest.substr(comma + 1));
+            int lo = 0;
+            int hi = 0;
+            if (left.find('-') != std::string::npos || !parse_display_range(left, lo, hi) ||
+                right.empty()) {
+                status_message_ = "Usage: u <n>, <amount> (e.g. u 4, 450 or u 4, 2s+3)";
+                return true;
+            }
+            partial_fulfill_display_item(lo, right, /*add=*/false);
+            return true;
+        }
         int lo = 0;
         int hi = 0;
         if (!parse_display_range(tokens[1], lo, hi)) {

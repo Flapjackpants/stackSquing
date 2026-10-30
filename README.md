@@ -133,6 +133,13 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 - `unfulfill 3` or `u 3`
 - `unfulfill 14-24` or `u 14-24` — clear fulfillment for a range
 
+Partial fulfillment subtracts an amount from the Missing (and Need) column and writes `a <raw count>` at the end of the row. Amounts may be raw counts or use stacks/chests for that item (`2s`, `1c`, `2s+3`, `2s 3`). Repeated partials add up; once the amount reaches the item's Missing count the row becomes a plain `a`.
+
+- `a 4, 450` — mark 450 of item 4 gathered
+- `a 4, 2s+3` — mark 2 stacks + 3 gathered
+- `u 4, 100` — un-add 100 (from a fully fulfilled item this leaves `a <missing − 100>`)
+- `u 4` — clears both full and partial fulfillment
+
 ### Navigation
 
 - `up` / `down` — scroll the material list, help, or overview screen
