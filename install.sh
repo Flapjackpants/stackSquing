@@ -13,7 +13,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-info() { printf '==> %s\n' "$*"; }
+info() { printf '==> %s\n' "$*" >&2; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 need_cmd() {
@@ -65,7 +65,7 @@ download_source() {
     info "Downloading ${REPO}@${ref}"
     local ok=0
     for url in "${urls[@]}"; do
-        if curl -fsSL "${url}" -o "${archive}"; then
+        if curl -fsL "${url}" -o "${archive}" 2>/dev/null; then
             ok=1
             break
         fi
@@ -82,12 +82,12 @@ download_source() {
 build_and_install() {
     local src="$1"
     info "Building (Release)"
-    cmake -S "${src}" -B "${src}/build" -DCMAKE_BUILD_TYPE=Release
-    cmake --build "${src}/build" --config Release
+    cmake -S "${src}" -B "${src}/build" -DCMAKE_BUILD_TYPE=Release >&2 || die "cmake configure failed"
+    cmake --build "${src}/build" --config Release >&2 || die "build failed"
 
     info "Installing to ${INSTALL_PREFIX}/bin/stackSquing"
     mkdir -p "${INSTALL_PREFIX}/bin"
-    cmake --install "${src}/build" --prefix "${INSTALL_PREFIX}"
+    cmake --install "${src}/build" --prefix "${INSTALL_PREFIX}" >&2 || die "install failed"
 
     local bin="${INSTALL_PREFIX}/bin/stackSquing"
     [[ -x "${bin}" ]] || die "install failed: ${bin} not found"
@@ -112,8 +112,8 @@ main() {
     check_deps "${os}"
 
     local src bin
-    src="$(download_source)"
-    bin="$(build_and_install "${src}")"
+    src="$(download_source)" || exit 1
+    bin="$(build_and_install "${src}")" || exit 1
 
     printf '\nInstalled: %s\n' "${bin}"
     ensure_path_hint
