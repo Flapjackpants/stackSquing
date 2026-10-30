@@ -7,6 +7,11 @@
 #include "groups.hpp"
 #include "model.hpp"
 
+struct LineInput {
+    std::string text;
+    bool resized = false;
+};
+
 class NcursesRenderer {
 public:
     NcursesRenderer();
@@ -28,7 +33,7 @@ public:
               const std::vector<std::string>& help_lines = {},
               const std::string& panel_title = "Help");
 
-    std::string read_line(std::vector<std::string>& command_history);
+    LineInput read_line(std::vector<std::string>& command_history, const std::string& initial = "");
     bool should_quit() const { return should_quit_; }
     bool needs_redraw() const { return needs_redraw_; }
     void clear_needs_redraw() { needs_redraw_ = false; }
@@ -38,7 +43,6 @@ private:
     bool needs_redraw_ = true;
     bool strikethrough_supported_ = false;
 
-    void handle_resize();
     std::string truncate(const std::string& text, int width) const;
     void draw_box_row(int y, int width, const std::string& content) const;
 };

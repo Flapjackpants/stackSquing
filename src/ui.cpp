@@ -1,6 +1,5 @@
 #include "ui.hpp"
 
-#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
@@ -75,10 +74,6 @@ void delete_forward(std::string& line, size_t& cursor) {
     }
     line.erase(cursor, 1);
 }
-
-volatile sig_atomic_t g_resize_flag = 0;
-
-void on_sigwinch(int) { g_resize_flag = 1; }
 
 std::string column_label(QuantityColumn column) {
     switch (column) {
@@ -184,7 +179,6 @@ bool NcursesRenderer::init() {
 #ifdef A_STRIKETHROUGH
     strikethrough_supported_ = (termattrs() & A_STRIKETHROUGH) != 0;
 #endif
-    signal(SIGWINCH, on_sigwinch);
     refresh();
     return true;
 }
@@ -193,7 +187,6 @@ void NcursesRenderer::shutdown() {
     if (isendwin()) {
         return;
     }
-    signal(SIGWINCH, SIG_DFL);
     endwin();
 }
 
@@ -221,16 +214,6 @@ void NcursesRenderer::draw_box_row(int y, int width, const std::string& content)
     mvaddch(y, width - 1, '|');
 }
 
-void NcursesRenderer::handle_resize() {
-    if (g_resize_flag) {
-        g_resize_flag = 0;
-        endwin();
-        refresh();
-        clear();
-        needs_redraw_ = true;
-    }
-}
-
 void NcursesRenderer::draw(const MaterialList& list,
                            const std::vector<DisplayRow>& rows,
                            const AppSettings& settings,
@@ -240,7 +223,6 @@ void NcursesRenderer::draw(const MaterialList& list,
                            int scroll_offset,
                            const std::vector<std::string>& help_lines,
                            const std::string& panel_title) {
-    handle_resize();
     clear();
 
     const int width = COLS;
@@ -417,11 +399,10 @@ void NcursesRenderer::draw(const MaterialList& list,
     refresh();
 }
 
-std::string NcursesRenderer::read_line(std::vector<std::string>& command_history) {
-    handle_resize();
-
-    std::string line;
-    size_t cursor = 0;
+LineInput NcursesRenderer::read_line(std::vector<std::string>& command_history,
+                                     const std::string& initial) {
+    std::string line = initial;
+    size_t cursor = line.size();
     bool insert_mode = true;
     std::string saved_draft;
     size_t history_index = command_history.size();
@@ -446,11 +427,10 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
     int ch = 0;
     while ((ch = getch()) != '\n' && ch != KEY_ENTER && ch != 27) {
         if (ch == ERR) {
-            if (g_resize_flag) {
-                handle_resize();
-                redraw_prompt();
-            }
             continue;
+        }
+        if (ch == KEY_RESIZE) {
+            return {line, true};
         }
 
         if (ch == KEY_UP) {
@@ -534,5 +514,5 @@ std::string NcursesRenderer::read_line(std::vector<std::string>& command_history
     }
 
     curs_set(1);
-    return line;
+    return {line, false};
 }

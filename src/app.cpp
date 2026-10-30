@@ -211,6 +211,7 @@ std::vector<std::string> App::build_help_text() {
         "  Home/End (typing)     Jump to start/end of input",
         "  Insert (typing)       Toggle insert/overwrite mode",
         "  Delete (typing)       Delete character after cursor",
+        "  Window resize         Redraws automatically; typed input is kept",
         "",
         "Other:",
         "  reload                Re-read current file, or newer material_list_*.txt",
@@ -284,8 +285,18 @@ int App::run() {
     status_message_ = "Loaded " + path_basename(file_path_) + ".";
     rebuild_and_draw();
 
+    std::string pending_input;
     while (!ui_.should_quit()) {
-        const std::string command = trim(ui_.read_line(command_history_));
+        const LineInput input = ui_.read_line(command_history_, pending_input);
+        if (input.resized) {
+            pending_input = input.text;
+            input_line_ = pending_input;
+            rebuild_and_draw();
+            continue;
+        }
+        pending_input.clear();
+        input_line_.clear();
+        const std::string command = trim(input.text);
         if (command.empty()) {
             rebuild_and_draw();
             continue;
