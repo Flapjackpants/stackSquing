@@ -1,5 +1,6 @@
 #include "ui_text.hpp"
 
+#include <algorithm>
 #include <vector>
 
 namespace {
@@ -75,4 +76,8 @@ std::string scroll_indicator(int first, int last, int total) {
         return "";
     }
     return "rows " + std::to_string(first) + "-" + std::to_string(last) + " of " + std::to_string(total);
+}
+
+int clamp_scroll(int offset, int total, int page_rows) {
+    return std::clamp(offset, 0, std::max(0, total - std::max(0, page_rows)));
 }

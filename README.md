@@ -136,6 +136,7 @@ Items are numbered in display order. Mark an item fulfilled (strikes through in 
 ### Navigation
 
 - `up` / `down` — scroll the material list, help, or overview screen
+- `PageUp` / `PageDown` while typing — scroll one page; typed input is kept
 - Arrow keys while typing — move cursor, browse command history (up/down), toggle insert/overwrite (Insert), delete forward (Delete)
 - Resizing the terminal redraws the screen automatically; anything you were typing is kept
 

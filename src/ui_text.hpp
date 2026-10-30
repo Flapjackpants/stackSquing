@@ -15,3 +15,4 @@ struct PanelLineParts {
 PanelLineParts split_panel_line(const std::string& line);
 
 std::string scroll_indicator(int first, int last, int total);
+int clamp_scroll(int offset, int total, int page_rows);

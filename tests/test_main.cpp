@@ -205,6 +205,15 @@ void test_scroll_indicator() {
     CHECK_EQ(scroll_indicator(0, 0, 0), std::string(""));
 }
 
+void test_clamp_scroll() {
+    CHECK(clamp_scroll(5, 64, 10) == 5);
+    CHECK(clamp_scroll(100, 64, 10) == 54);
+    CHECK(clamp_scroll(-3, 64, 10) == 0);
+    CHECK(clamp_scroll(4, 8, 10) == 0);
+    CHECK(clamp_scroll(2, 0, 10) == 0);
+    CHECK(clamp_scroll(70, 64, 0) == 64);
+}
+
 int main() {
     test_classify_status_errors();
     test_classify_status_warning();
@@ -214,6 +223,7 @@ int main() {
     test_split_panel_entry();
     test_split_panel_detail();
     test_scroll_indicator();
+    test_clamp_scroll();
     test_overview_empty();
     test_overview_group_basic();
     test_overview_group_filters();

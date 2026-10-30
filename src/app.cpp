@@ -205,6 +205,7 @@ std::vector<std::string> App::build_help_text() {
         "Navigation:",
         "  up                              Scroll up",
         "  down                            Scroll down",
+        "  PageUp/PageDown                 Scroll one page (while typing)",
         "  Up arrow (typing)               Previous command",
         "  Down arrow (typing)             Next command",
         "  Left/Right (typing)             Move cursor",
@@ -294,6 +295,13 @@ int App::run() {
             rebuild_and_draw();
             continue;
         }
+        if (input.scroll_pages != 0) {
+            pending_input = input.text;
+            input_line_ = pending_input;
+            scroll_offset_ = std::max(0, scroll_offset_ + input.scroll_pages * ui_.page_rows());
+            rebuild_and_draw();
+            continue;
+        }
         pending_input.clear();
         input_line_.clear();
         const std::string command = trim(input.text);
@@ -324,7 +332,7 @@ void App::rebuild_and_draw() {
     }
     const auto rows =
         DisplayOrderBuilder::build(list_, groups_, settings_.column, settings_.hide_fulfilled_groups);
-    ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_, panel_title_);
+    scroll_offset_ = ui_.draw(list_, rows, settings_, groups_, input_line_, status_message_, scroll_offset_, help_lines_, panel_title_);
 }
 
 bool App::fulfill_display_range(int lo, int hi, bool fulfilled) {

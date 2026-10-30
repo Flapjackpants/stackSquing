@@ -11,6 +11,7 @@
 struct LineInput {
     std::string text;
     bool resized = false;
+    int scroll_pages = 0;  // +1 PageDown, -1 PageUp
 };
 
 class NcursesRenderer {
@@ -24,7 +25,7 @@ public:
     bool init();
     void shutdown();
 
-    void draw(const MaterialList& list,
+    int draw(const MaterialList& list,
               const std::vector<DisplayRow>& rows,
               const AppSettings& settings,
               const GroupStore& groups,
@@ -37,12 +38,14 @@ public:
     LineInput read_line(std::vector<std::string>& command_history, const std::string& initial = "");
     bool should_quit() const { return should_quit_; }
     bool needs_redraw() const { return needs_redraw_; }
+    int page_rows() const { return page_rows_; }
     void clear_needs_redraw() { needs_redraw_ = false; }
 
 private:
     bool should_quit_ = false;
     bool needs_redraw_ = true;
     bool strikethrough_supported_ = false;
+    int page_rows_ = 1;
 
     std::string truncate(const std::string& text, int width) const;
     void draw_box_segments(int y, int width,

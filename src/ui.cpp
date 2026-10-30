@@ -263,7 +263,7 @@ void NcursesRenderer::draw_box_segments(
     draw_side_borders(y, width);
 }
 
-void NcursesRenderer::draw(const MaterialList& list,
+int NcursesRenderer::draw(const MaterialList& list,
                            const std::vector<DisplayRow>& rows,
                            const AppSettings& settings,
                            const GroupStore& groups,
@@ -282,7 +282,7 @@ void NcursesRenderer::draw(const MaterialList& list,
         const int len = static_cast<int>(msg.size());
         mvaddstr(height / 2, std::max(0, (width - len) / 2), msg.c_str());
         refresh();
-        return;
+        return scroll_offset;
     }
 
     const int num_width = 4;
@@ -329,6 +329,7 @@ void NcursesRenderer::draw(const MaterialList& list,
     const int table_top = y;
     const int footer_rows = 4;
     const int visible_rows = height - table_top - footer_rows;
+    page_rows_ = std::max(1, visible_rows - 2);
     const bool showing_help = !help_lines.empty();
     int total = 0;
     int effective_scroll = 0;
@@ -346,8 +347,7 @@ void NcursesRenderer::draw(const MaterialList& list,
         ++y;
 
         total = static_cast<int>(help_lines.size());
-        const int max_scroll = std::max(0, total - visible_rows + 2);
-        effective_scroll = std::min(scroll_offset, max_scroll);
+        effective_scroll = clamp_scroll(scroll_offset, total, visible_rows - 2);
 
         for (int i = 0; i < visible_rows - 2; ++i) {
             const int row_idx = effective_scroll + i;
@@ -393,8 +393,7 @@ void NcursesRenderer::draw(const MaterialList& list,
         ++y;
 
         total = static_cast<int>(rows.size());
-        const int max_scroll = std::max(0, total - visible_rows + 2);
-        effective_scroll = std::min(scroll_offset, max_scroll);
+        effective_scroll = clamp_scroll(scroll_offset, total, visible_rows - 2);
 
         for (int i = 0; i < visible_rows - 2; ++i) {
             const int row_idx = effective_scroll + i;
@@ -507,6 +506,7 @@ void NcursesRenderer::draw(const MaterialList& list,
     }
 
     refresh();
+    return effective_scroll;
 }
 
 LineInput NcursesRenderer::read_line(std::vector<std::string>& command_history,
@@ -541,6 +541,12 @@ LineInput NcursesRenderer::read_line(std::vector<std::string>& command_history,
         }
         if (ch == KEY_RESIZE) {
             return {line, true};
+        }
+        if (ch == KEY_NPAGE) {
+            return {line, false, 1};
+        }
+        if (ch == KEY_PPAGE) {
+            return {line, false, -1};
         }
 
         if (ch == KEY_UP) {
