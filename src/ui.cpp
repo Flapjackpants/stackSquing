@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "ui_text.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -174,6 +175,7 @@ bool NcursesRenderer::init() {
         init_pair(2, COLOR_YELLOW, -1);
         init_pair(3, COLOR_GREEN, -1);
         init_pair(4, COLOR_BLACK, -1);
+        init_pair(5, COLOR_RED, -1);
     }
     strikethrough_supported_ = false;
 #ifdef A_STRIKETHROUGH
@@ -203,15 +205,62 @@ std::string NcursesRenderer::truncate(const std::string& text, int width) const 
     return text.substr(0, static_cast<size_t>(width - 3)) + "...";
 }
 
+namespace {
+
+void draw_side_borders(int y, int width) {
+    attr_t saved_attrs;
+    short saved_pair;
+    attr_get(&saved_attrs, &saved_pair, nullptr);
+    attrset(A_NORMAL);
+    mvaddch(y, 0, ACS_VLINE);
+    mvaddch(y, width - 1, ACS_VLINE);
+    attr_set(saved_attrs, saved_pair, nullptr);
+}
+
+}  // namespace
+
 void NcursesRenderer::draw_box_row(int y, int width, const std::string& content) const {
-    mvaddch(y, 0, '|');
     const int inner = width - 2;
     std::string line = truncate(content, inner);
     mvaddstr(y, 1, line.c_str());
     for (int x = 1 + static_cast<int>(line.size()); x < width - 1; ++x) {
         mvaddch(y, x, ' ');
     }
-    mvaddch(y, width - 1, '|');
+    draw_side_borders(y, width);
+}
+
+void NcursesRenderer::draw_box_segments(
+    int y, int width, const std::vector<std::pair<std::string, int>>& segments) const {
+    const int inner = width - 2;
+    std::string combined;
+    for (const auto& seg : segments) {
+        combined += seg.first;
+    }
+    const std::string shown = truncate(combined, inner);
+    size_t pos = 0;
+    int x = 1;
+    for (const auto& seg : segments) {
+        if (pos >= shown.size()) {
+            break;
+        }
+        const std::string piece = shown.substr(pos, seg.first.size());
+        pos += piece.size();
+        if (piece.empty()) {
+            continue;
+        }
+        if (seg.second != 0) {
+            attron(seg.second);
+        }
+        mvaddstr(y, x, piece.c_str());
+        if (seg.second != 0) {
+            attroff(seg.second);
+        }
+        x += static_cast<int>(piece.size());
+    }
+    for (; x < width - 1; ++x) {
+        mvaddch(y, x, ' ');
+    }
+    draw_side_borders(y, width);
 }
 
 void NcursesRenderer::draw(const MaterialList& list,
@@ -229,7 +278,9 @@ void NcursesRenderer::draw(const MaterialList& list,
     const int height = LINES;
 
     if (width < 72) {
-        mvaddstr(0, 0, "Terminal too narrow (minimum 72 columns).");
+        const std::string msg = "Terminal too narrow (minimum 72 columns).";
+        const int len = static_cast<int>(msg.size());
+        mvaddstr(height / 2, std::max(0, (width - len) / 2), msg.c_str());
         refresh();
         return;
     }
@@ -239,16 +290,16 @@ void NcursesRenderer::draw(const MaterialList& list,
     const int status_width = 11;
     const int name_width = width - num_width - qty_width - status_width - 5;
 
-    auto draw_hline = [&](int y_pos) {
-        mvaddch(y_pos, 0, '+');
+    auto draw_hline = [&](int y_pos, chtype left, chtype right) {
+        mvaddch(y_pos, 0, left);
         for (int x = 1; x < width - 1; ++x) {
-            mvaddch(y_pos, x, '-');
+            mvaddch(y_pos, x, ACS_HLINE);
         }
-        mvaddch(y_pos, width - 1, '+');
+        mvaddch(y_pos, width - 1, right);
     };
 
     int y = 0;
-    draw_hline(y++);
+    draw_hline(y++, ACS_ULCORNER, ACS_URCORNER);
 
     std::ostringstream title;
     if (!list.placement_name.empty()) {
@@ -263,7 +314,9 @@ void NcursesRenderer::draw(const MaterialList& list,
     if (!filename.empty()) {
         title << "  [" << filename << "]";
     }
+    attron(A_BOLD);
     draw_box_row(y++, width, title.str());
+    attroff(A_BOLD);
 
     std::ostringstream meta;
     meta << "Column: " << column_label(settings.column)
@@ -271,29 +324,54 @@ void NcursesRenderer::draw(const MaterialList& list,
          << " | HideFul: " << (settings.hide_fulfilled_groups ? "on" : "off")
          << " | Groups: " << enabled_group_names(groups);
     draw_box_row(y++, width, meta.str());
-    draw_hline(y++);
-
-    draw_hline(y++);
+    draw_hline(y++, ACS_LTEE, ACS_RTEE);
 
     const int table_top = y;
     const int footer_rows = 4;
     const int visible_rows = height - table_top - footer_rows;
     const bool showing_help = !help_lines.empty();
+    int total = 0;
+    int effective_scroll = 0;
 
     if (showing_help) {
+        attron(A_BOLD | COLOR_PAIR(1));
         draw_box_row(y++, width, panel_title);
-        draw_box_row(y++, width, std::string(width - 4, '-'));
+        attroff(A_BOLD | COLOR_PAIR(1));
+        draw_box_row(y, width, "");
+        attron(A_DIM);
+        for (int x = 2; x <= width - 3; ++x) {
+            mvaddch(y, x, ACS_HLINE);
+        }
+        attroff(A_DIM);
+        ++y;
 
-        const int total_rows = static_cast<int>(help_lines.size());
-        const int max_scroll = std::max(0, total_rows - visible_rows + 2);
-        const int effective_scroll = std::min(scroll_offset, max_scroll);
+        total = static_cast<int>(help_lines.size());
+        const int max_scroll = std::max(0, total - visible_rows + 2);
+        effective_scroll = std::min(scroll_offset, max_scroll);
 
         for (int i = 0; i < visible_rows - 2; ++i) {
             const int row_idx = effective_scroll + i;
-            if (row_idx >= total_rows) {
+            if (row_idx >= total) {
                 break;
             }
-            draw_box_row(table_top + 2 + i, width, help_lines[row_idx]);
+            const int line_y = table_top + 2 + i;
+            const auto parts = split_panel_line(help_lines[row_idx]);
+            switch (parts.kind) {
+            case PanelLineKind::Blank:
+                draw_box_row(line_y, width, "");
+                break;
+            case PanelLineKind::Heading:
+                draw_box_segments(line_y, width, {{parts.key, COLOR_PAIR(1) | A_BOLD}});
+                break;
+            case PanelLineKind::Entry:
+                draw_box_segments(line_y, width,
+                                  {{parts.indent, 0}, {parts.key, COLOR_PAIR(2)}, {parts.rest, 0}});
+                break;
+            case PanelLineKind::Detail:
+                draw_box_segments(line_y, width,
+                                  {{parts.indent, 0}, {parts.key, static_cast<int>(A_DIM)}, {parts.rest, 0}});
+                break;
+            }
         }
     } else {
         const int leader_width = name_width + 3 + qty_width;
@@ -302,33 +380,37 @@ void NcursesRenderer::draw(const MaterialList& list,
         header << " " << std::setw(num_width - 1) << "#"
                << " | " << with_leader_dots("Item", "Qty", leader_width, true)
                << " | " << std::left << std::setw(status_width) << "Status";
+        attron(A_BOLD);
         draw_box_row(y++, width, header.str());
+        attroff(A_BOLD);
 
-        std::string divider;
-        divider.append(num_width, '-');
-        divider += "-+-";
-        divider.append(leader_width, '-');
-        divider += "-+-";
-        divider.append(status_width, '-');
-        draw_box_row(y++, width, divider);
+        draw_box_row(y, width, "");
+        for (int x = 1; x < width - 1; ++x) {
+            mvaddch(y, x, ACS_HLINE);
+        }
+        mvaddch(y, 1 + num_width + 1, ACS_PLUS);
+        mvaddch(y, 1 + num_width + 3 + leader_width + 1, ACS_PLUS);
+        ++y;
 
-        const int total_rows = static_cast<int>(rows.size());
-        const int max_scroll = std::max(0, total_rows - visible_rows + 2);
-        const int effective_scroll = std::min(scroll_offset, max_scroll);
+        total = static_cast<int>(rows.size());
+        const int max_scroll = std::max(0, total - visible_rows + 2);
+        effective_scroll = std::min(scroll_offset, max_scroll);
 
         for (int i = 0; i < visible_rows - 2; ++i) {
             const int row_idx = effective_scroll + i;
-            if (row_idx >= total_rows) {
+            if (row_idx >= total) {
                 break;
             }
             const auto& row = rows[row_idx];
             const int row_y = table_top + 2 + i;
 
             if (row.kind == DisplayRowKind::Separator) {
-                attron(COLOR_PAIR(4) | A_DIM);
-                draw_box_row(row_y, width,
-                             std::string(num_width + leader_width + status_width + 6, '-'));
-                attroff(COLOR_PAIR(4) | A_DIM);
+                draw_box_row(row_y, width, "");
+                attron(A_DIM);
+                for (int x = 2; x <= width - 3; ++x) {
+                    mvaddch(row_y, x, ACS_HLINE);
+                }
+                attroff(A_DIM);
                 continue;
             }
 
@@ -387,14 +469,42 @@ void NcursesRenderer::draw(const MaterialList& list,
         }
     }
 
-    draw_hline(height - footer_rows);
+    draw_hline(height - footer_rows, ACS_LTEE, ACS_RTEE);
     draw_box_row(height - footer_rows + 1, width, "> " + input_line);
     if (!status_message.empty()) {
-        attron(COLOR_PAIR(3));
+        int status_attrs = COLOR_PAIR(3);
+        switch (classify_status(status_message)) {
+        case StatusKind::Warning:
+            status_attrs = COLOR_PAIR(2) | A_BOLD;
+            break;
+        case StatusKind::Error:
+            status_attrs = COLOR_PAIR(5) | A_BOLD;
+            break;
+        case StatusKind::Normal:
+            break;
+        }
+        attron(status_attrs);
         draw_box_row(height - footer_rows + 2, width, status_message);
-        attroff(COLOR_PAIR(3));
+        attroff(status_attrs);
     }
-    draw_hline(height - 1);
+    draw_hline(height - 1, ACS_LLCORNER, ACS_LRCORNER);
+
+    const int first = effective_scroll + 1;
+    const int last = std::min(total, effective_scroll + visible_rows - 2);
+    const std::string hint = " help | overview | up/down scroll | q quit ";
+    const std::string indicator = scroll_indicator(first, last, total);
+    const std::string indicator_block = indicator.empty() ? "" : " " + indicator + " ";
+    if (2 + static_cast<int>(hint.size() + indicator_block.size()) + 2 <= width) {
+        attron(A_DIM);
+        mvaddstr(height - 1, 2, hint.c_str());
+        attroff(A_DIM);
+    }
+    if (!indicator_block.empty()) {
+        const int ix = width - 2 - static_cast<int>(indicator_block.size());
+        if (ix > 1) {
+            mvaddstr(height - 1, ix, indicator_block.c_str());
+        }
+    }
 
     refresh();
 }
@@ -411,12 +521,12 @@ LineInput NcursesRenderer::read_line(std::vector<std::string>& command_history,
     auto redraw_prompt = [&]() {
         const int width = COLS;
         const auto view = build_prompt_view(line, cursor, width);
-        mvaddch(prompt_row, 0, '|');
+        mvaddch(prompt_row, 0, ACS_VLINE);
         mvaddstr(prompt_row, 1, view.visible.c_str());
         for (int x = 1 + static_cast<int>(view.visible.size()); x < width - 1; ++x) {
             mvaddch(prompt_row, x, ' ');
         }
-        mvaddch(prompt_row, width - 1, '|');
+        mvaddch(prompt_row, width - 1, ACS_VLINE);
         move(prompt_row, view.cursor_column);
         refresh();
     };

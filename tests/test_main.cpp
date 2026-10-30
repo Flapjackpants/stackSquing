@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "overview.hpp"
+#include "ui_text.hpp"
 
 static int g_failures = 0;
 
@@ -115,7 +116,75 @@ void test_overview_group_in_supergroup() {
     CHECK(contains(out, "      in: smelting"));
 }
 
+void test_classify_status_errors() {
+    for (const char* m : {"Usage: open <x>", "Group not found: x", "Group already exists: x",
+                          "Unknown command. Type help.", "Group add requires include:term[,term]",
+                          "Failed to save group.", "Invalid item number: 3"}) {
+        CHECK(classify_status(m) == StatusKind::Error);
+    }
+}
+
+void test_classify_status_warning() {
+    CHECK(classify_status("File changed on disk. Type reload.") == StatusKind::Warning);
+}
+
+void test_classify_status_normal() {
+    CHECK(classify_status("Added group: Oak") == StatusKind::Normal);
+    CHECK(classify_status("") == StatusKind::Normal);
+}
+
+void test_split_panel_blank() {
+    CHECK(split_panel_line("").kind == PanelLineKind::Blank);
+    const auto p = split_panel_line("   ");
+    CHECK(p.kind == PanelLineKind::Blank);
+    CHECK(p.indent.empty() && p.key.empty() && p.rest.empty());
+}
+
+void test_split_panel_heading() {
+    const auto p = split_panel_line("Groups:");
+    CHECK(p.kind == PanelLineKind::Heading);
+    CHECK_EQ(p.key, std::string("Groups:"));
+}
+
+void test_split_panel_entry() {
+    auto p = split_panel_line("  help    Show help");
+    CHECK(p.kind == PanelLineKind::Entry);
+    CHECK_EQ(p.indent, std::string("  "));
+    CHECK_EQ(p.key, std::string("help"));
+    CHECK_EQ(p.rest, std::string("    Show help"));
+    p = split_panel_line("  Oak [on]");
+    CHECK(p.kind == PanelLineKind::Entry);
+    CHECK_EQ(p.key, std::string("Oak [on]"));
+    CHECK_EQ(p.rest, std::string(""));
+}
+
+void test_split_panel_detail() {
+    auto p = split_panel_line("      include: oak, birch");
+    CHECK(p.kind == PanelLineKind::Detail);
+    CHECK_EQ(p.indent, std::string(6, ' '));
+    CHECK_EQ(p.key, std::string("include:"));
+    CHECK_EQ(p.rest, std::string(" oak, birch"));
+    p = split_panel_line(std::string(24, ' ') + "(terms may contain spaces)");
+    CHECK(p.kind == PanelLineKind::Detail);
+    CHECK_EQ(p.key, std::string(""));
+    CHECK_EQ(p.rest, std::string("(terms may contain spaces)"));
+}
+
+void test_scroll_indicator() {
+    CHECK_EQ(scroll_indicator(1, 20, 54), std::string("rows 1-20 of 54"));
+    CHECK_EQ(scroll_indicator(5, 5, 5), std::string("rows 5-5 of 5"));
+    CHECK_EQ(scroll_indicator(0, 0, 0), std::string(""));
+}
+
 int main() {
+    test_classify_status_errors();
+    test_classify_status_warning();
+    test_classify_status_normal();
+    test_split_panel_blank();
+    test_split_panel_heading();
+    test_split_panel_entry();
+    test_split_panel_detail();
+    test_scroll_indicator();
     test_overview_empty();
     test_overview_group_basic();
     test_overview_group_filters();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "display_order.hpp"
@@ -44,5 +45,7 @@ private:
     bool strikethrough_supported_ = false;
 
     std::string truncate(const std::string& text, int width) const;
+    void draw_box_segments(int y, int width,
+                           const std::vector<std::pair<std::string, int>>& segments) const;
     void draw_box_row(int y, int width, const std::string& content) const;
 };

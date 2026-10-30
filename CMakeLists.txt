@@ -15,6 +15,7 @@ add_library(stackSquing_core STATIC
     src/display_order.cpp
     src/paths.cpp
     src/overview.cpp
+    src/ui_text.cpp
 )
 target_include_directories(stackSquing_core PUBLIC
     ${CMAKE_SOURCE_DIR}/src
