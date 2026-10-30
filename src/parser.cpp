@@ -66,44 +66,80 @@ bool parse_int_field(const std::string& field, int& value) {
     return true;
 }
 
-bool line_has_fulfilled_marker(const std::string& line) {
-    const auto trimmed = trim(line);
-    if (trimmed.size() >= 2 && trimmed.substr(trimmed.size() - 2) == "|a") {
-        return true;
-    }
+struct RowTail {
+    bool fulfilled = false;
+    int partial = 0;
+};
+
+// The line up to and including its last '|'.
+std::string row_base(const std::string& line) {
     const auto pos = line.rfind('|');
     if (pos == std::string::npos) {
+        const auto end = line.find_last_not_of(" \t\r\n");
+        return end == std::string::npos ? std::string() : line.substr(0, end + 1);
+    }
+    return line.substr(0, pos + 1);
+}
+
+bool all_digits(const std::string& s) {
+    if (s.empty()) {
         return false;
     }
-    const auto tail = trim(line.substr(pos + 1));
-    return tail == "a";
+    for (char c : s) {
+        if (!std::isdigit(static_cast<unsigned char>(c))) {
+            return false;
+        }
+    }
+    return true;
 }
 
-std::string strip_fulfilled_marker(const std::string& line) {
-    const auto trimmed = trim(line);
-    if (trimmed.size() >= 2 && trimmed.substr(trimmed.size() - 2) == "|a") {
-        return trim(line.substr(0, line.find_last_of('|') + 1)) + " ";
-    }
+RowTail parse_row_tail(const std::string& line, int missing) {
+    RowTail result;
     const auto pos = line.rfind('|');
     if (pos == std::string::npos) {
-        return line;
+        return result;
     }
-    const auto tail = trim(line.substr(pos + 1));
-    if (tail == "a") {
-        return line.substr(0, pos + 1) + " ";
+    std::stringstream ss(line.substr(pos + 1));
+    std::vector<std::string> tokens;
+    std::string token;
+    while (ss >> token) {
+        tokens.push_back(token);
     }
-    return line;
+    if (tokens.empty() || tokens[0] != "a") {
+        return result;
+    }
+    if (tokens.size() < 2 || !all_digits(tokens[1])) {
+        result.fulfilled = true;
+        return result;
+    }
+    // More than 9 digits cannot be a sane partial amount: treat as fully gathered.
+    const int n = tokens[1].size() > 9 ? missing : std::stoi(tokens[1]);
+    if (n == 0) {
+        return result;
+    }
+    if (n >= missing) {
+        result.fulfilled = true;
+        return result;
+    }
+    result.partial = n;
+    return result;
 }
 
-std::string apply_fulfilled_marker(const std::string& line) {
-    if (line_has_fulfilled_marker(line)) {
-        return line;
+std::string build_row(const std::string& line, bool fulfilled, int partial) {
+    std::string row = row_base(line);
+    if (fulfilled) {
+        row += "a";
+    } else if (partial > 0) {
+        row += "a " + std::to_string(partial);
     }
-    const auto trimmed = trim(line);
-    if (!trimmed.empty() && trimmed.back() == '|') {
-        return trim(line) + "a";
+    return row;
+}
+
+void write_item_line(MaterialList& list, MaterialItem& item, const std::string& updated) {
+    if (item.line_index >= 0 && item.line_index < static_cast<int>(list.raw_lines.size())) {
+        list.raw_lines[item.line_index] = updated;
     }
-    return trim(line) + "|a";
+    item.original_line = updated;
 }
 
 bool parse_data_row(const std::string& line, MaterialItem& item) {
@@ -133,8 +169,9 @@ bool parse_data_row(const std::string& line, MaterialItem& item) {
         !parse_int_field(fields[4], parsed.available)) {
         return false;
     }
-    parsed.fulfilled = line_has_fulfilled_marker(line) ||
-                       (fields.size() > 5 && trim(fields[5]) == "a");
+    const auto tail = parse_row_tail(line, parsed.missing);
+    parsed.fulfilled = tail.fulfilled;
+    parsed.partial = tail.partial;
     item = parsed;
     return true;
 }
@@ -181,18 +218,27 @@ void MaterialListParser::set_fulfilled(MaterialList& list, int item_index, bool 
 
     auto& item = list.items[item_index];
     item.fulfilled = fulfilled;
+    item.partial = 0;
+    write_item_line(list, item, build_row(item.original_line, fulfilled, 0));
+}
 
-    std::string updated = item.original_line;
-    if (fulfilled) {
-        updated = apply_fulfilled_marker(updated);
+void MaterialListParser::set_partial(MaterialList& list, int item_index, int amount) {
+    if (item_index < 0 || item_index >= static_cast<int>(list.items.size())) {
+        throw std::runtime_error("Invalid item index");
+    }
+
+    auto& item = list.items[item_index];
+    if (amount > 0 && amount >= item.missing) {
+        item.fulfilled = true;
+        item.partial = 0;
+    } else if (amount <= 0) {
+        item.fulfilled = false;
+        item.partial = 0;
     } else {
-        updated = strip_fulfilled_marker(updated);
+        item.fulfilled = false;
+        item.partial = amount;
     }
-
-    if (item.line_index >= 0 && item.line_index < static_cast<int>(list.raw_lines.size())) {
-        list.raw_lines[item.line_index] = updated;
-    }
-    item.original_line = updated;
+    write_item_line(list, item, build_row(item.original_line, item.fulfilled, item.partial));
 }
 
 void MaterialListParser::save(const MaterialList& list) {

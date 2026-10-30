@@ -1,8 +1,13 @@
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "format.hpp"
 #include "overview.hpp"
+#include "parser.hpp"
 #include "stack_size.hpp"
 #include "ui_text.hpp"
 
@@ -71,6 +76,148 @@ void test_stack_size_beds() {
     CHECK(max_stack_size("straw bed") == 16);
     CHECK(max_stack_size("Red Bed") == 1);
     CHECK(max_stack_size("Oak Sign") == 16);
+}
+
+bool ends_with_str(const std::string& s, const std::string& suffix) {
+    return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+std::string test_list_path() {
+    return (std::filesystem::temp_directory_path() / "stacksquing_test_list.txt").string();
+}
+
+void write_test_list(const std::vector<std::string>& tails) {
+    std::ofstream out(test_list_path());
+    out << "+----------------------------+-------+---------+-----------+\n";
+    out << "| Material List for placement 'test'                       |\n";
+    out << "+----------------------------+-------+---------+-----------+\n";
+    out << "| Item                       | Total | Missing | Available |\n";
+    out << "+----------------------------+-------+---------+-----------+\n";
+    for (const auto& tail : tails) {
+        out << "| Glow Lichen                |   985 |     985 |         0 |" << tail << "\n";
+    }
+    out << "+----------------------------+-------+---------+-----------+\n";
+}
+
+void test_parse_amount_valid() {
+    int v = 0;
+    CHECK(parse_amount("450", 64, v) && v == 450);
+    CHECK(parse_amount("2s", 64, v) && v == 128);
+    CHECK(parse_amount("2s+3", 64, v) && v == 131);
+    CHECK(parse_amount("2s 3", 64, v) && v == 131);
+    CHECK(parse_amount(" 1c + 2s ", 64, v) && v == 1856);
+    CHECK(parse_amount("1C", 16, v) && v == 432);
+    CHECK(parse_amount("1c", 1, v) && v == 27);
+    CHECK(parse_amount("2s", 1, v) && v == 2);
+    CHECK(parse_amount("3", 0, v) && v == 3);
+}
+
+void test_parse_amount_invalid() {
+    int v = 0;
+    for (const char* text : {"", "abc", "2x", "s", "0", "-5", "2s+", "1234567890"}) {
+        if (parse_amount(text, 64, v)) {
+            std::cerr << "parse_amount unexpectedly accepted: \"" << text << "\"\n";
+            ++g_failures;
+        }
+    }
+}
+
+void test_quantity_for_partial() {
+    MaterialItem item;
+    item.total = 985;
+    item.missing = 985;
+    item.available = 100;
+    item.partial = 450;
+    CHECK(quantity_for(item, QuantityColumn::Missing) == 535);
+    CHECK(quantity_for(item, QuantityColumn::Need) == 435);
+    CHECK(quantity_for(item, QuantityColumn::Total) == 985);
+    item.partial = 0;
+    CHECK(quantity_for(item, QuantityColumn::Missing) == 985);
+}
+
+void test_parser_reads_partial_tail() {
+    write_test_list({"", "a", "a 450", "a 2000", "a 0"});
+    const auto list = MaterialListParser::load(test_list_path());
+    CHECK(list.items.size() == 5);
+    if (list.items.size() == 5) {
+        const bool fulfilled[5] = {false, true, false, true, false};
+        const int partial[5] = {0, 0, 450, 0, 0};
+        for (int i = 0; i < 5; ++i) {
+            CHECK(list.items[i].fulfilled == fulfilled[i]);
+            CHECK(list.items[i].partial == partial[i]);
+        }
+        CHECK(quantity_for(list.items[2], QuantityColumn::Missing) == 535);
+        CHECK(quantity_for(list.items[2], QuantityColumn::Total) == 985);
+    }
+    std::filesystem::remove(test_list_path());
+}
+
+void test_parser_set_partial() {
+    write_test_list({""});
+    auto list = MaterialListParser::load(test_list_path());
+    MaterialListParser::set_partial(list, 0, 450);
+    CHECK(ends_with_str(list.raw_lines[list.items[0].line_index], "|a 450"));
+    CHECK(list.items[0].original_line == list.raw_lines[list.items[0].line_index]);
+    CHECK(list.items[0].partial == 450);
+    CHECK(!list.items[0].fulfilled);
+
+    MaterialListParser::set_partial(list, 0, 750);
+    CHECK(ends_with_str(list.raw_lines[list.items[0].line_index], "|a 750"));
+
+    for (int amount : {985, 5000}) {
+        MaterialListParser::set_partial(list, 0, 450);
+        MaterialListParser::set_partial(list, 0, amount);
+        const auto& line = list.raw_lines[list.items[0].line_index];
+        CHECK(ends_with_str(line, "|a"));
+        CHECK(list.items[0].fulfilled);
+        CHECK(list.items[0].partial == 0);
+    }
+
+    for (int amount : {0, -5}) {
+        MaterialListParser::set_partial(list, 0, 450);
+        MaterialListParser::set_partial(list, 0, amount);
+        const auto& line = list.raw_lines[list.items[0].line_index];
+        CHECK(ends_with_str(line, "|"));
+        CHECK(!list.items[0].fulfilled);
+        CHECK(list.items[0].partial == 0);
+    }
+
+    bool threw = false;
+    try {
+        MaterialListParser::set_partial(list, 99, 1);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    CHECK(threw);
+    std::filesystem::remove(test_list_path());
+}
+
+void test_parser_set_fulfilled_clears_partial() {
+    write_test_list({"a 450"});
+    auto list = MaterialListParser::load(test_list_path());
+    MaterialListParser::set_fulfilled(list, 0, true);
+    CHECK(ends_with_str(list.raw_lines[list.items[0].line_index], "|a"));
+    CHECK(list.items[0].partial == 0);
+    CHECK(list.items[0].fulfilled);
+    MaterialListParser::set_fulfilled(list, 0, false);
+    CHECK(ends_with_str(list.raw_lines[list.items[0].line_index], "|"));
+    CHECK(list.items[0].partial == 0);
+    CHECK(!list.items[0].fulfilled);
+    std::filesystem::remove(test_list_path());
+}
+
+void test_parser_partial_roundtrip() {
+    write_test_list({""});
+    auto list = MaterialListParser::load(test_list_path());
+    MaterialListParser::set_partial(list, 0, 450);
+    MaterialListParser::save(list);
+    const auto reloaded = MaterialListParser::load(test_list_path());
+    CHECK(reloaded.items.size() == 1);
+    if (!reloaded.items.empty()) {
+        CHECK(reloaded.items[0].partial == 450);
+        CHECK(!reloaded.items[0].fulfilled);
+    }
+    std::filesystem::remove(test_list_path());
 }
 
 void test_overview_empty() {
@@ -233,6 +380,13 @@ int main() {
     test_scroll_indicator();
     test_clamp_scroll();
     test_stack_size_beds();
+    test_parse_amount_valid();
+    test_parse_amount_invalid();
+    test_quantity_for_partial();
+    test_parser_reads_partial_tail();
+    test_parser_set_partial();
+    test_parser_set_fulfilled_clears_partial();
+    test_parser_partial_roundtrip();
     test_overview_empty();
     test_overview_group_basic();
     test_overview_group_filters();

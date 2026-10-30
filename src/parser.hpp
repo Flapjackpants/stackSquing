@@ -8,5 +8,7 @@ class MaterialListParser {
 public:
     static MaterialList load(const std::string& file_path);
     static void set_fulfilled(MaterialList& list, int item_index, bool fulfilled);
+    // amount >= item.missing -> fulfilled; amount <= 0 -> cleared; otherwise partial.
+    static void set_partial(MaterialList& list, int item_index, int amount);
     static void save(const MaterialList& list);
 };
