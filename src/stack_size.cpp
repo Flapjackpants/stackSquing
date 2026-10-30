@@ -81,7 +81,7 @@ bool is_unstackable(const std::string& name) {
 
     // Vehicles & storage that don't stack
     if (ends_with_any(name, {" boat", " raft", " boat with chest", " raft with chest"}) ||
-        contains(name, "minecart") || ends_with(name, " bed") || ends_with(name, " shulker box") ||
+        contains(name, "minecart") || (ends_with(name, " bed") && name != "straw bed") || ends_with(name, " shulker box") ||
         name == "shulker box" || ends_with(name, " bundle") || name == "bundle") {
         return true;
     }
@@ -106,7 +106,7 @@ bool is_stack_of_sixteen(const std::string& name) {
     static const std::unordered_set<std::string> exact = {
         "snowball",       "egg",           "blue egg",     "brown egg",
         "ender pearl",    "bucket",        "honey bottle", "armor stand",
-        "written book",   "ominous banner",
+        "written book",   "ominous banner", "straw bed",
     };
     if (exact.count(name) != 0) {
         return true;

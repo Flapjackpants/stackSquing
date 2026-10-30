@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "overview.hpp"
+#include "stack_size.hpp"
 #include "ui_text.hpp"
 
 static int g_failures = 0;
@@ -63,6 +64,13 @@ static bool contains(const Lines& v, const std::string& s) {
         }
     }
     return false;
+}
+
+void test_stack_size_beds() {
+    CHECK(max_stack_size("Straw Bed") == 16);
+    CHECK(max_stack_size("straw bed") == 16);
+    CHECK(max_stack_size("Red Bed") == 1);
+    CHECK(max_stack_size("Oak Sign") == 16);
 }
 
 void test_overview_empty() {
@@ -224,6 +232,7 @@ int main() {
     test_split_panel_detail();
     test_scroll_indicator();
     test_clamp_scroll();
+    test_stack_size_beds();
     test_overview_empty();
     test_overview_group_basic();
     test_overview_group_filters();
