@@ -1,6 +1,7 @@
 package com.flapjackpants.stacksquing.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.flapjackpants.stacksquing.client.BookText.Slot;
@@ -58,5 +59,30 @@ class BookTextTest {
     void prefix() {
         assertEquals("7) ", BookText.itemPrefix(7));
         assertEquals("12) ", BookText.itemPrefix(12));
+    }
+
+    @Test
+    void containerPanelWidth() {
+        assertEquals(150, BookText.containerPanelWidth());
+    }
+
+    @Test
+    void containerGeometryChest() {
+        assertTrue(BookText.containerBookFits(427, 176));
+        int left = BookText.containerLeftPos(427, 176);
+        assertEquals(50, left);
+        assertEquals(210, BookText.containerBookX(left, 176));
+    }
+
+    @Test
+    void containerBookFitsBoundary() {
+        assertTrue(BookText.containerBookFits(326, 176));
+        assertFalse(BookText.containerBookFits(325, 176));
+    }
+
+    @Test
+    void containerBookTop() {
+        assertEquals(104, BookText.containerBookTop(400));
+        assertEquals(2, BookText.containerBookTop(150));
     }
 }

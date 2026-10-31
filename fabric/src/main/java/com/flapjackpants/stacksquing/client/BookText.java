@@ -4,6 +4,10 @@ import com.flapjackpants.stacksquing.config.BookLayout;
 
 public final class BookText {
     public static final int LINES_PER_PAGE = 14, TEXT_WIDTH = 114, IMAGE_SIZE = 192, DOUBLE_MIN_SCREEN_WIDTH = 300;
+    public static final int BOOK_LEFT_MARGIN = 20;
+    public static final int BOOK_VISIBLE_WIDTH = 146;
+    public static final int CONTAINER_GAP = 4;
+    public static final int MIN_TOP = 2;
 
     public record Slot(int page, int line) {
     }
@@ -49,6 +53,26 @@ public final class BookText {
             return "";
         }
         return ".".repeat(gapPx / dotWidthPx);
+    }
+
+    public static int containerPanelWidth() {
+        return CONTAINER_GAP + BOOK_VISIBLE_WIDTH;
+    }
+
+    public static boolean containerBookFits(int screenWidth, int imageWidth) {
+        return imageWidth + containerPanelWidth() <= screenWidth;
+    }
+
+    public static int containerLeftPos(int screenWidth, int imageWidth) {
+        return (screenWidth - (imageWidth + containerPanelWidth())) / 2;
+    }
+
+    public static int containerBookX(int leftPos, int imageWidth) {
+        return leftPos + imageWidth + CONTAINER_GAP - BOOK_LEFT_MARGIN;
+    }
+
+    public static int containerBookTop(int screenHeight) {
+        return Math.max(MIN_TOP, (screenHeight - IMAGE_SIZE) / 2);
     }
 
     public static String itemPrefix(int displayNumber) {
