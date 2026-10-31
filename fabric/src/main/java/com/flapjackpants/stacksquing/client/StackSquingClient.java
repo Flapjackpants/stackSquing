@@ -66,6 +66,7 @@ public final class StackSquingClient implements ClientModInitializer {
         KeyMapping openBook = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.stacksquing.open_book", InputConstants.KEY_B,
                 KeyMapping.Category.register(Identifier.fromNamespaceAndPath("stacksquing", "main"))));
+        ContainerBook.register(openBook);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openBook.consumeClick()) {

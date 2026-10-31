@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.flapjackpants.stacksquing.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["AbstractContainerScreenMixin"],
+  "injectors": { "defaultRequire": 1 }
+}
