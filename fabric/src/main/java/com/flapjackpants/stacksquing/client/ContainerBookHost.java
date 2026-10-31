@@ -6,6 +6,8 @@ public interface ContainerBookHost {
 
     int stacksquing$imageWidth();
 
+    void stacksquing$setLeftPos(int leftPos);
+
     /** Calls Screen.rebuildWidgets(). */
     void stacksquing$rebuild();
 }

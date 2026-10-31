@@ -9,9 +9,12 @@ import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
 import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CraftingScreen;
 import net.minecraft.client.gui.screens.inventory.DispenserScreen;
 import net.minecraft.client.gui.screens.inventory.HopperScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
 import net.minecraft.client.input.KeyEvent;
 
@@ -19,6 +22,7 @@ public final class ContainerBook {
     private static boolean shown;
     private static String savedInput = "";
     private static CommandLine commandLine;
+    private static Panel current;
 
     private ContainerBook() {
     }
@@ -30,11 +34,38 @@ public final class ContainerBook {
 
     public static boolean eligible(Screen screen) {
         return screen instanceof ContainerScreen || screen instanceof ShulkerBoxScreen
-                || screen instanceof HopperScreen || screen instanceof DispenserScreen;
+                || screen instanceof HopperScreen || screen instanceof DispenserScreen
+                || screen instanceof InventoryScreen || screen instanceof CraftingScreen
+                || screen instanceof AbstractFurnaceScreen;
     }
 
     public static boolean active(Screen screen, int screenWidth, int imageWidth) {
-        return shown && eligible(screen) && BookText.containerBookFits(screenWidth, imageWidth);
+        return shown && eligible(screen) && BookText.containerBookFits(screenWidth, imageWidth)
+                && !recipeBlocked(screen, screenWidth, imageWidth);
+    }
+
+    /** Recipe book open and no room for it, the container and the side book. */
+    public static boolean recipeBlocked(Screen screen, int screenWidth, int imageWidth) {
+        return screen instanceof RecipeBookHost r && r.stacksquing$recipeBookVisible()
+                && !BookText.recipeAndBookFit(screenWidth, imageWidth);
+    }
+
+    public static int recipeShift(Screen screen, int screenWidth, int imageWidth) {
+        return shown && eligible(screen) ? BookText.recipeShift(screenWidth, imageWidth) : 0;
+    }
+
+    public static boolean besideScreen(Screen screen) {
+        return current != null && current.screen == screen && current.renderer != null;
+    }
+
+    public static void onRecipeBookToggled(Screen screen) {
+        if (current == null || current.screen != screen || !shown) {
+            return;
+        }
+        if (recipeBlocked(screen, screen.width, current.host.stacksquing$imageWidth())) {
+            shown = false;
+        }
+        current.rebuild();
     }
 
     private static CommandLine commandLine() {
@@ -89,10 +120,21 @@ public final class ContainerBook {
 
         boolean onKey(KeyEvent event, KeyMapping openBook) {
             if (box == null || !box.isFocused()) {
+                if (screen.isInputCaptured()) {
+                    return true;
+                }
                 if (openBook.matches(event)) {
-                    shown = !shown;
-                    if (shown) {
-                        StackSquingClient.state().onOpen();
+                    if (recipeBlocked(screen, screen.width, host.stacksquing$imageWidth())) {
+                        if (!shown) {
+                            shown = true;
+                            StackSquingClient.state().onOpen();
+                        }
+                        ((RecipeBookHost) screen).stacksquing$closeRecipeBook();
+                    } else {
+                        shown = !shown;
+                        if (shown) {
+                            StackSquingClient.state().onOpen();
+                        }
                     }
                     rebuild();
                     return false;
@@ -151,6 +193,12 @@ public final class ContainerBook {
             }
             Panel panel = new Panel(screen);
             panel.register(openBook);
+            current = panel;
+            ScreenEvents.remove(screen).register(s -> {
+                if (current == panel) {
+                    current = null;
+                }
+            });
             panel.attach();
         });
     }

@@ -85,4 +85,26 @@ class BookTextTest {
         assertEquals(104, BookText.containerBookTop(400));
         assertEquals(2, BookText.containerBookTop(150));
     }
+
+    @Test
+    void recipeGeometry480() {
+        assertEquals(229, BookText.recipeOpenLeftPos(480, 176));
+        assertEquals(80, BookText.recipeBookLeft(480));
+        assertEquals(475, BookText.recipeGroupWidth(480, 176));
+        assertEquals(78, BookText.recipeShift(480, 176));
+        assertEquals(78, BookText.recipeShift(640, 176));
+    }
+
+    @Test
+    void recipeFitBoundary() {
+        assertTrue(BookText.recipeAndBookFit(475, 176));
+        assertFalse(BookText.recipeAndBookFit(474, 176));
+        assertFalse(BookText.recipeAndBookFit(378, 176));
+    }
+
+    @Test
+    void recipeShiftZeroWhenNoFit() {
+        assertEquals(0, BookText.recipeShift(474, 176));
+        assertEquals(0, BookText.recipeShift(426, 176));
+    }
 }

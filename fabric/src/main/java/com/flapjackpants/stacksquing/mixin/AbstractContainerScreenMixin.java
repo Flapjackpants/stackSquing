@@ -37,6 +37,11 @@ public abstract class AbstractContainerScreenMixin extends Screen implements Con
     }
 
     @Override
+    public void stacksquing$setLeftPos(int leftPos) {
+        this.leftPos = leftPos;
+    }
+
+    @Override
     public void stacksquing$rebuild() {
         rebuildWidgets();
     }

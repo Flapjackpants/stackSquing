@@ -8,6 +8,7 @@ public final class BookText {
     public static final int BOOK_VISIBLE_WIDTH = 146;
     public static final int CONTAINER_GAP = 4;
     public static final int MIN_TOP = 2;
+    public static final int RECIPE_BOOK_WIDTH = 147, RECIPE_BOOK_OFFSET = 86, RECIPE_NARROW_WIDTH = 379;
 
     public record Slot(int page, int line) {
     }
@@ -73,6 +74,31 @@ public final class BookText {
 
     public static int containerBookTop(int screenHeight) {
         return Math.max(MIN_TOP, (screenHeight - IMAGE_SIZE) / 2);
+    }
+
+    /** Vanilla RecipeBookComponent.updateScreenPosition with the book open on a wide screen. */
+    public static int recipeOpenLeftPos(int screenWidth, int imageWidth) {
+        return 177 + (screenWidth - imageWidth - 200) / 2;
+    }
+
+    public static int recipeBookLeft(int screenWidth) {
+        return (screenWidth - RECIPE_BOOK_WIDTH) / 2 - RECIPE_BOOK_OFFSET;
+    }
+
+    /** Recipe book left edge to side book right edge. */
+    public static int recipeGroupWidth(int screenWidth, int imageWidth) {
+        return recipeOpenLeftPos(screenWidth, imageWidth) + imageWidth + containerPanelWidth()
+                - recipeBookLeft(screenWidth);
+    }
+
+    public static boolean recipeAndBookFit(int screenWidth, int imageWidth) {
+        return screenWidth >= RECIPE_NARROW_WIDTH && recipeGroupWidth(screenWidth, imageWidth) <= screenWidth;
+    }
+
+    /** How far the recipe book and container move left so all three are centred; 0 when they don't fit. */
+    public static int recipeShift(int screenWidth, int imageWidth) {
+        return recipeAndBookFit(screenWidth, imageWidth)
+                ? recipeBookLeft(screenWidth) - (screenWidth - recipeGroupWidth(screenWidth, imageWidth)) / 2 : 0;
     }
 
     public static String itemPrefix(int displayNumber) {
