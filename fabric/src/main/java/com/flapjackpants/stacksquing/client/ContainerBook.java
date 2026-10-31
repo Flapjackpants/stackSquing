@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.client.gui.screens.inventory.DispenserScreen;
 import net.minecraft.client.gui.screens.inventory.HopperScreen;
 import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.client.input.KeyEvent;
 
 public final class ContainerBook {
     private static boolean shown;
@@ -48,86 +49,109 @@ public final class ContainerBook {
         screen.setFocused(null);
     }
 
-    public static void register(KeyMapping openBook) {
-        ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
-            if (!eligible(screen)) {
+    /**
+     * Book state for one container screen. Fabric only fires AFTER_INIT (and resets per-screen events) from
+     * setScreen and resize, not from rebuildWidgets, so the handlers are registered once per Fabric init and
+     * {@link #attach} rebuilds the book after every rebuildWidgets call.
+     */
+    private static final class Panel {
+        private final Screen screen;
+        private final ContainerBookHost host;
+        private BookRenderer renderer;
+        private EditBox box;
+
+        Panel(Screen screen) {
+            this.screen = screen;
+            this.host = (ContainerBookHost) screen;
+        }
+
+        void attach() {
+            renderer = null;
+            box = null;
+            if (!active(screen, screen.width, host.stacksquing$imageWidth())) {
                 return;
             }
-            ContainerBookHost host = (ContainerBookHost) screen;
-            EditBox[] boxRef = new EditBox[1];
+            renderer = new BookRenderer(Screens.getFont(screen), BookLayout.SINGLE,
+                    BookText.containerBookX(host.stacksquing$leftPos(), host.stacksquing$imageWidth()),
+                    screen.width / 2, BookText.containerBookTop(screen.height));
+            box = renderer.createInput(savedInput);
+            box.setCanLoseFocus(true);
+            box.setFocused(false);
+            box.setResponder(v -> savedInput = v);
+            Screens.getWidgets(screen).add(box);
+            renderer.clamp();
+        }
 
-            ScreenKeyboardEvents.allowKeyPress(screen).register((s, event) -> {
-                if (boxRef[0] != null && boxRef[0].isFocused()) {
-                    return true;
-                }
+        void rebuild() {
+            host.stacksquing$rebuild();
+            attach();
+        }
+
+        boolean onKey(KeyEvent event, KeyMapping openBook) {
+            if (box == null || !box.isFocused()) {
                 if (openBook.matches(event)) {
                     shown = !shown;
                     if (shown) {
                         StackSquingClient.state().onOpen();
                     }
-                    host.stacksquing$rebuild();
+                    rebuild();
                     return false;
                 }
                 return true;
-            });
-
-            if (!active(screen, w, host.stacksquing$imageWidth())) {
-                return;
             }
-
-            BookRenderer renderer = new BookRenderer(Screens.getFont(screen), BookLayout.SINGLE,
-                    BookText.containerBookX(host.stacksquing$leftPos(), host.stacksquing$imageWidth()), w / 2,
-                    BookText.containerBookTop(h));
-            EditBox box = renderer.createInput(savedInput);
-            box.setCanLoseFocus(true);
-            box.setFocused(false);
-            box.setResponder(v -> savedInput = v);
-            boxRef[0] = box;
-            Screens.getWidgets(screen).add(box);
-            renderer.clamp();
-
-            ScreenEvents.afterBackground(screen).register((s, g, mouseX, mouseY, delta) -> renderer.drawBackground(g));
-            ScreenEvents.afterExtract(screen).register((s, g, mouseX, mouseY, delta) -> renderer.drawPage(g));
-
-            ScreenKeyboardEvents.allowKeyPress(screen).register((s, event) -> {
-                if (!box.isFocused()) {
-                    return true;
+            if (event.key() == InputConstants.KEY_ESCAPE) {
+                unfocus(screen, box);
+                return false;
+            }
+            switch (commandLine().handleKey(event.key(), box, renderer)) {
+                case CLOSE -> {
+                    shown = false;
+                    savedInput = "";
+                    rebuild();
                 }
-                if (event.key() == InputConstants.KEY_ESCAPE) {
-                    unfocus(s, box);
-                    return false;
+                case HANDLED -> {
                 }
-                switch (commandLine().handleKey(event.key(), box, renderer)) {
-                    case CLOSE -> {
-                        shown = false;
-                        savedInput = "";
-                        host.stacksquing$rebuild();
-                        return false;
-                    }
-                    case HANDLED -> {
-                        return false;
-                    }
-                    default -> {
-                        box.keyPressed(event);
-                        return false;
-                    }
+                default -> box.keyPressed(event);
+            }
+            return false;
+        }
+
+        void register(KeyMapping openBook) {
+            ScreenKeyboardEvents.allowKeyPress(screen).register((s, event) -> onKey(event, openBook));
+            ScreenEvents.afterBackground(screen).register((s, g, mouseX, mouseY, delta) -> {
+                if (renderer != null) {
+                    renderer.drawBackground(g);
                 }
             });
-
+            ScreenEvents.afterExtract(screen).register((s, g, mouseX, mouseY, delta) -> {
+                if (renderer != null) {
+                    renderer.drawPage(g);
+                }
+            });
             ScreenMouseEvents.allowMouseClick(screen).register((s, event) -> {
-                if (box.isFocused() && !box.isMouseOver(event.x(), event.y())) {
+                if (box != null && box.isFocused() && !box.isMouseOver(event.x(), event.y())) {
                     unfocus(s, box);
                 }
                 return true;
             });
-
             ScreenMouseEvents.allowMouseScroll(screen).register((s, mouseX, mouseY, horizontal, vertical) -> {
-                if (renderer.contains(mouseX, mouseY)) {
+                if (renderer != null && renderer.contains(mouseX, mouseY)) {
                     renderer.scrollBy(-(int) Math.signum(vertical));
                     return false;
                 }
                 return true;
             });
+        }
+    }
+
+    public static void register(KeyMapping openBook) {
+        ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+            if (!eligible(screen)) {
+                return;
+            }
+            Panel panel = new Panel(screen);
+            panel.register(openBook);
+            panel.attach();
         });
     }
 }
