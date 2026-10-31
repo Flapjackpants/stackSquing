@@ -1,12 +1,15 @@
 package com.flapjackpants.stacksquing.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
 import com.flapjackpants.stacksquing.config.BookLayout;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
@@ -50,6 +53,37 @@ public final class ContainerBook {
                 && !BookText.recipeAndBookFit(screenWidth, imageWidth);
     }
 
+    /** Recipe book open and no room for all three even at GUI scale 1. */
+    public static boolean recipeNeverFits(Screen screen, int imageWidth) {
+        return screen instanceof RecipeBookHost r && r.stacksquing$recipeBookVisible()
+                && !BookText.recipeAndBookFit(Minecraft.getInstance().getWindow().getWidth(), imageWidth);
+    }
+
+    /** Window.calculateScale result, lowered while the current screen shows the recipe book and the side book. */
+    public static int capScale(int vanillaScale, int framebufferWidth) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!shown || mc == null || mc.gui == null) {
+            return vanillaScale;
+        }
+        Screen s = mc.gui.screen();
+        if (!(eligible(s) && s instanceof RecipeBookHost r && r.stacksquing$recipeBookVisible())) {
+            return vanillaScale;
+        }
+        return BookText.recipeScale(vanillaScale, framebufferWidth, ((ContainerBookHost) s).stacksquing$imageWidth());
+    }
+
+    /** Applies the capped scale if it differs from the window's; true if the screen was resized (and so re-initialised). */
+    public static boolean refreshScale() {
+        Minecraft mc = Minecraft.getInstance();
+        Window w = mc.getWindow();
+        int want = w.calculateScale(mc.options.guiScale().get(), mc.isEnforceUnicode());
+        if (want == w.getGuiScale()) {
+            return false;
+        }
+        mc.resizeGui();
+        return true;
+    }
+
     public static int recipeShift(Screen screen, int screenWidth, int imageWidth) {
         return shown && eligible(screen) ? BookText.recipeShift(screenWidth, imageWidth) : 0;
     }
@@ -62,7 +96,7 @@ public final class ContainerBook {
         if (current == null || current.screen != screen || !shown) {
             return;
         }
-        if (recipeBlocked(screen, screen.width, current.host.stacksquing$imageWidth())) {
+        if (recipeNeverFits(screen, current.host.stacksquing$imageWidth())) {
             shown = false;
         }
         current.rebuild();
@@ -114,8 +148,10 @@ public final class ContainerBook {
         }
 
         void rebuild() {
-            host.stacksquing$rebuild();
-            attach();
+            if (!refreshScale()) {
+                host.stacksquing$rebuild();
+                attach();
+            }
         }
 
         boolean onKey(KeyEvent event, KeyMapping openBook) {
@@ -124,7 +160,7 @@ public final class ContainerBook {
                     return true;
                 }
                 if (openBook.matches(event)) {
-                    if (recipeBlocked(screen, screen.width, host.stacksquing$imageWidth())) {
+                    if (recipeNeverFits(screen, host.stacksquing$imageWidth())) {
                         if (!shown) {
                             shown = true;
                             StackSquingClient.state().onOpen();
@@ -187,6 +223,7 @@ public final class ContainerBook {
     }
 
     public static void register(KeyMapping openBook) {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> refreshScale());
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
             if (!eligible(screen)) {
                 return;

@@ -107,4 +107,18 @@ class BookTextTest {
         assertEquals(0, BookText.recipeShift(474, 176));
         assertEquals(0, BookText.recipeShift(426, 176));
     }
+
+    @Test
+    void recipeScaleLowersUntilFit() {
+        assertEquals(5, BookText.recipeScale(6, 2560, 176));
+        assertEquals(6, BookText.recipeScale(7, 2880, 176));
+        assertEquals(2, BookText.recipeScale(3, 1366, 176));
+    }
+
+    @Test
+    void recipeScaleKeepsVanilla() {
+        assertEquals(4, BookText.recipeScale(4, 1920, 176));
+        assertEquals(3, BookText.recipeScale(3, 400, 176));
+        assertEquals(1, BookText.recipeScale(1, 1000, 176));
+    }
 }

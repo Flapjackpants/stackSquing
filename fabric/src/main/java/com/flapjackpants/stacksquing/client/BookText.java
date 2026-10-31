@@ -104,4 +104,14 @@ public final class BookText {
     public static String itemPrefix(int displayNumber) {
         return displayNumber + ") ";
     }
+
+    /** Largest GUI scale up to vanillaScale at which the recipe book, container and side book fit; vanillaScale if none. */
+    public static int recipeScale(int vanillaScale, int framebufferWidth, int imageWidth) {
+        for (int s = vanillaScale; s >= 1; s--) {
+            if (recipeAndBookFit(framebufferWidth / s, imageWidth)) {
+                return s;
+            }
+        }
+        return vanillaScale;
+    }
 }
