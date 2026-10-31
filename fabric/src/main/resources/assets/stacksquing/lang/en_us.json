@@ -23,5 +23,22 @@
   "stacksquing.config.format.css": "Chests/stacks",
   "stacksquing.config.hide_fulfilled": "Hide fulfilled groups",
   "stacksquing.config.no_supergroups": "No saved supergroups.",
-  "stacksquing.config.no_groups": "No saved groups."
+  "stacksquing.config.no_groups": "No saved groups.",
+  "stacksquing.config.add_group": "Add group",
+  "stacksquing.config.group.edit": "Edit",
+  "stacksquing.config.group.delete": "Delete",
+  "stacksquing.config.group.delete_title": "Delete group %s?",
+  "stacksquing.config.group.delete_message": "This removes it from the groups file.",
+  "stacksquing.config.group.new_title": "New group",
+  "stacksquing.config.group.edit_title": "Edit group",
+  "stacksquing.config.group.name": "Name",
+  "stacksquing.config.group.enabled": "Enabled",
+  "stacksquing.config.group.include": "Include",
+  "stacksquing.config.group.exclude": "Exclude",
+  "stacksquing.config.group.terms_hint": "Comma-separated terms",
+  "stacksquing.config.group.items": "Items in current list",
+  "stacksquing.config.group.items_help": "Click an item to add or remove it.",
+  "stacksquing.config.group.no_list": "No material list loaded.",
+  "stacksquing.config.group.save": "Save",
+  "stacksquing.config.group.save_failed": "Could not save the groups file."
 }

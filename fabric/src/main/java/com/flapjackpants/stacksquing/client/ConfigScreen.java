@@ -9,26 +9,17 @@ import com.flapjackpants.stacksquing.core.Supergroup;
 import java.nio.file.Path;
 import java.util.List;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
-import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 public final class ConfigScreen extends Screen {
-    private static final int ROW_WIDTH = 310;
-    private static final int ROW_HEIGHT = 25;
-    private static final int WIDGET_HEIGHT = 20;
-    private static final int LABEL_WIDTH = 90;
+    private static final int ROW_WIDTH = SettingsList.ROW_WIDTH;
+    private static final int WIDGET_HEIGHT = SettingsList.WIDGET_HEIGHT;
 
     private final Screen parent;
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
@@ -59,7 +50,7 @@ public final class ConfigScreen extends Screen {
     @Override
     protected void init() {
         layout.addTitleHeader(title, font);
-        list = layout.addToContents(new SettingsList(minecraft, width, layout));
+        list = layout.addToContents(new SettingsList(minecraft, font, width, layout));
         buildRows();
         layout.addToFooter(Button.builder(CommonComponents.GUI_DONE, button -> onClose()).width(200).build());
         layout.visitWidgets(this::addRenderableWidget);
@@ -121,12 +112,33 @@ public final class ConfigScreen extends Screen {
             list.addNote(Component.translatable("stacksquing.config.no_groups"));
         }
         for (ItemGroup g : itemGroups) {
-            list.addWide(CycleButton.onOffBuilder(g.enabled)
+            Button edit = Button.builder(Component.translatable("stacksquing.config.group.edit"),
+                    b -> minecraft.gui.setScreen(new GroupEditScreen(this, g, this::rebuildRows))).width(50).build();
+            Button delete = Button.builder(Component.translatable("stacksquing.config.group.delete"),
+                    b -> minecraft.gui.setScreen(new ConfirmScreen(confirmed -> {
+                        if (confirmed) {
+                            groups.removeGroup(g.name);
+                            rebuildRows();
+                        }
+                        minecraft.gui.setScreen(this);
+                    }, Component.translatable("stacksquing.config.group.delete_title", g.name),
+                            Component.translatable("stacksquing.config.group.delete_message")))).width(50).build();
+            list.addSplit(CycleButton.onOffBuilder(g.enabled)
                     .create(0, 0, ROW_WIDTH, WIDGET_HEIGHT, Component.literal(g.name), (b, v) -> {
                         g.enabled = v;
                         groupsDirty = true;
-                    }));
+                    }), edit, delete);
         }
+        list.addWide(Button.builder(Component.translatable("stacksquing.config.add_group"),
+                b -> minecraft.gui.setScreen(new GroupEditScreen(this, null, this::rebuildRows)))
+                .width(ROW_WIDTH).build());
+    }
+
+    private void rebuildRows() {
+        double scroll = list.scrollAmount();
+        list.clearAll();
+        buildRows();
+        list.setScrollAmount(scroll);
     }
 
     @Override
@@ -150,101 +162,5 @@ public final class ConfigScreen extends Screen {
         StackSquingClient.saveConfig();
         StackSquingClient.state().refresh();
         minecraft.gui.setScreen(parent);
-    }
-
-    private final class SettingsList extends ContainerObjectSelectionList<SettingsList.Row> {
-        SettingsList(Minecraft minecraft, int width, HeaderAndFooterLayout layout) {
-            super(minecraft, width, layout.getContentHeight(), layout.getHeaderHeight(), ROW_HEIGHT);
-        }
-
-        @Override
-        public int getRowWidth() {
-            return ROW_WIDTH;
-        }
-
-        void addHeading(Component text) {
-            addEntry(new LabelRow(text.copy().withStyle(ChatFormatting.BOLD), 0xFFFFFFFF));
-        }
-
-        void addNote(Component text) {
-            addEntry(new LabelRow(text, 0xFFAAAAAA));
-        }
-
-        void addWide(AbstractWidget widget) {
-            addEntry(new WidgetRow(null, widget));
-        }
-
-        void addText(String labelKey, String value, String hint, java.util.function.Consumer<String> onChange) {
-            EditBox box = new EditBox(font, 0, 0, ROW_WIDTH - LABEL_WIDTH, WIDGET_HEIGHT,
-                    Component.translatable(labelKey));
-            box.setMaxLength(1024);
-            box.setHint(Component.literal(hint).withStyle(ChatFormatting.DARK_GRAY));
-            box.setValue(value);
-            box.setResponder(onChange);
-            addEntry(new WidgetRow(Component.translatable(labelKey), box));
-        }
-
-        abstract class Row extends ContainerObjectSelectionList.Entry<Row> {
-        }
-
-        final class LabelRow extends Row {
-            private final Component text;
-            private final int color;
-
-            LabelRow(Component text, int color) {
-                this.text = text;
-                this.color = color;
-            }
-
-            @Override
-            public void extractContent(GuiGraphicsExtractor g, int mouseX, int mouseY, boolean hovered, float delta) {
-                g.text(font, text, getContentX(), getContentYMiddle() - font.lineHeight / 2 + 4, color);
-            }
-
-            @Override
-            public List<? extends GuiEventListener> children() {
-                return List.of();
-            }
-
-            @Override
-            public List<? extends NarratableEntry> narratables() {
-                return List.of();
-            }
-        }
-
-        final class WidgetRow extends Row {
-            private final Component label;
-            private final AbstractWidget widget;
-
-            WidgetRow(Component label, AbstractWidget widget) {
-                this.label = label;
-                this.widget = widget;
-            }
-
-            @Override
-            public void extractContent(GuiGraphicsExtractor g, int mouseX, int mouseY, boolean hovered, float delta) {
-                int x = getContentX();
-                int w = getContentWidth();
-                if (label != null) {
-                    g.text(font, label, x, getContentYMiddle() - font.lineHeight / 2, 0xFFFFFFFF);
-                    widget.setPosition(x + LABEL_WIDTH, getContentY());
-                    widget.setWidth(w - LABEL_WIDTH);
-                } else {
-                    widget.setPosition(x, getContentY());
-                    widget.setWidth(w);
-                }
-                widget.extractRenderState(g, mouseX, mouseY, delta);
-            }
-
-            @Override
-            public List<? extends GuiEventListener> children() {
-                return List.of(widget);
-            }
-
-            @Override
-            public List<? extends NarratableEntry> narratables() {
-                return List.of(widget);
-            }
-        }
     }
 }
