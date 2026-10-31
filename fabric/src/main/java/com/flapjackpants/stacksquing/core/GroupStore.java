@@ -315,6 +315,42 @@ public final class GroupStore {
         return save();
     }
 
+    /** originalName == null adds a copy of edited; otherwise updates the stored group in place (renaming if needed). */
+    public boolean replaceGroup(String originalName, ItemGroup edited) {
+        if (edited.name.isBlank()) {
+            return false;
+        }
+        if (originalName == null) {
+            if (findGroup(edited.name) != null) {
+                return false;
+            }
+            groups.add(GroupEditing.copy(edited));
+            return save();
+        }
+        ItemGroup g = findGroup(originalName);
+        if (g == null) {
+            return false;
+        }
+        String newName = edited.name;
+        if (!newName.equals(originalName)) {
+            if (findGroup(newName) != null) {
+                return false;
+            }
+            for (Supergroup s : supergroups) {
+                s.include.replaceAll(t -> t.equals(originalName) ? newName : t);
+                s.exclude.replaceAll(t -> t.equals(originalName) ? newName : t);
+            }
+        }
+        g.name = newName;
+        g.include.clear();
+        g.include.addAll(edited.include);
+        g.exclude.clear();
+        g.exclude.addAll(edited.exclude);
+        g.enabled = edited.enabled;
+        g.order = edited.order;
+        return save();
+    }
+
     public ItemGroup findGroup(String name) {
         for (ItemGroup g : groups) {
             if (g.name.equals(name)) {

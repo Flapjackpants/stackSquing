@@ -152,4 +152,67 @@ class GroupStoreTest {
         assertFalse(store.removeSupergroup("trees"));
         assertEquals(null, store.findGroup("Oak"));
     }
+
+    @Test
+    void replaceGroupAddsNew() {
+        GroupStore store = store();
+        ItemGroup edited = group("Oak", List.of("oak"), List.of("sapling"), true);
+        assertTrue(store.replaceGroup(null, edited));
+        ItemGroup stored = store.findGroup("Oak");
+        assertNotNull(stored);
+        assertTrue(stored != edited);
+        edited.include.add("changed");
+        assertEquals(List.of("oak"), stored.include);
+        GroupStore reloaded = new GroupStore(store.configPath());
+        reloaded.load();
+        assertNotNull(reloaded.findGroup("Oak"));
+    }
+
+    @Test
+    void replaceGroupRejectsDuplicateAdd() {
+        GroupStore store = store();
+        assertTrue(store.addGroup(group("Oak", List.of("oak"), List.of(), true)));
+        assertFalse(store.replaceGroup(null, group("Oak", List.of("x"), List.of(), true)));
+        assertEquals(1, store.groups().size());
+        assertEquals(List.of("oak"), store.findGroup("Oak").include);
+    }
+
+    @Test
+    void replaceGroupRenamesAndUpdatesSupergroups() {
+        GroupStore store = store();
+        assertTrue(store.addGroup(group("Oak", List.of("oak"), List.of(), true)));
+        assertTrue(store.addSupergroup(supergroup("wood", List.of("Oak", "birch"), List.of("Oak"), true)));
+        ItemGroup stored = store.findGroup("Oak");
+        ItemGroup edited = new ItemGroup("Wood", List.of("log", "plank"), List.of("stripped"), false, 7);
+        assertTrue(store.replaceGroup("Oak", edited));
+        assertTrue(stored == store.findGroup("Wood"));
+        assertEquals(1, store.groups().size());
+        assertEquals("Wood", stored.name);
+        assertEquals(List.of("log", "plank"), stored.include);
+        assertEquals(List.of("stripped"), stored.exclude);
+        assertFalse(stored.enabled);
+        assertEquals(7, stored.order);
+        assertEquals(List.of("Wood", "birch"), store.findSupergroup("wood").include);
+        assertEquals(List.of("Wood"), store.findSupergroup("wood").exclude);
+        GroupStore reloaded = new GroupStore(store.configPath());
+        reloaded.load();
+        assertNotNull(reloaded.findGroup("Wood"));
+        assertEquals(null, reloaded.findGroup("Oak"));
+        assertEquals(7, reloaded.findGroup("Wood").order);
+    }
+
+    @Test
+    void replaceGroupRejectsConflicts() {
+        GroupStore store = store();
+        assertTrue(store.addGroup(group("Oak", List.of("oak"), List.of(), true)));
+        assertTrue(store.addGroup(group("Birch", List.of("birch"), List.of(), true)));
+        assertFalse(store.replaceGroup("Oak", group("Birch", List.of("x"), List.of(), false)));
+        assertFalse(store.replaceGroup("Nope", group("Other", List.of("x"), List.of(), false)));
+        assertFalse(store.replaceGroup("Oak", group("", List.of("x"), List.of(), false)));
+        assertFalse(store.replaceGroup(null, group("  ", List.of("x"), List.of(), false)));
+        assertEquals(2, store.groups().size());
+        assertEquals(List.of("oak"), store.findGroup("Oak").include);
+        assertTrue(store.findGroup("Oak").enabled);
+        assertEquals(List.of("birch"), store.findGroup("Birch").include);
+    }
 }
