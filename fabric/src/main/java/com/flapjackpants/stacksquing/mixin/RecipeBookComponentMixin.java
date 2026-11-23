@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(RecipeBookComponent.class)
 public abstract class RecipeBookComponentMixin implements RecipeBookShift {
@@ -28,5 +29,11 @@ public abstract class RecipeBookComponentMixin implements RecipeBookShift {
             shift = At.Shift.AFTER))
     private void stacksquing$applyShift(CallbackInfo ci) {
         xOffset += stacksquing$shift;
+    }
+
+    /** Vanilla compares xOffset to 86; without this the shifted book counts as the narrow overlay and closes on recipe click. */
+    @Inject(method = "isOffsetNextToMainGUI", at = @At("HEAD"), cancellable = true)
+    private void stacksquing$ignoreShift(CallbackInfoReturnable<Boolean> cir) {
+        cir.setReturnValue(xOffset - stacksquing$shift == 86);
     }
 }
