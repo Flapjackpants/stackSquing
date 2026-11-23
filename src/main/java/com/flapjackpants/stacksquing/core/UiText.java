@@ -2,7 +2,6 @@ package com.flapjackpants.stacksquing.core;
 
 import java.util.List;
 
-/** Port of src/ui_text.cpp. */
 public final class UiText {
     private UiText() {
     }

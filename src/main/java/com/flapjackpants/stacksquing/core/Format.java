@@ -2,7 +2,6 @@ package com.flapjackpants.stacksquing.core;
 
 import java.util.OptionalInt;
 
-/** Port of src/format.cpp. */
 public final class Format {
     public static final int DEFAULT_ITEMS_PER_STACK = 64, SLOTS_PER_CHEST = 27;
 

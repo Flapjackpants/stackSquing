@@ -3,7 +3,6 @@ package com.flapjackpants.stacksquing.core;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Port of src/overview.cpp. */
 public final class Overview {
     private Overview() {
     }

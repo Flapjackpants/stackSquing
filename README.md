@@ -1,87 +1,39 @@
 # stackSquing
 
-Interactive terminal tool for Litematica ASCII material lists. View totals in raw or chest/stack/item format, organize items into filter-based groups, and mark items fulfilled (saved back to the file with an `a` suffix).
+Client-only Fabric mod for Litematica material lists. It shows the list as a book and quill in game: view totals in raw or chest/stack/item format, organize items into filter-based groups, and mark items fulfilled (saved back to the file with an `a` suffix).
 
-## Install
+## Requirements
 
-macOS, Linux, or Windows (WSL / Git Bash):
+- Minecraft 26.3
+- Fabric Loader 0.20.1+
+- Fabric API
+- Mod Menu (optional, for the settings screen)
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | bash
-```
-
-That downloads the source, builds it, and installs `stackSquing` to `~/.local/bin`. Make sure that directory is on your `PATH`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Custom install location or git ref:
+## Build
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | INSTALL_PREFIX=/usr/local bash
-curl -fsSL https://raw.githubusercontent.com/Flapjackpants/stackSquing/main/install.sh | STACKSQUING_REF=v1.0.0 bash
+./gradlew build
 ```
 
-**Windows note:** use [WSL](https://learn.microsoft.com/windows/wsl/) (recommended) or Git Bash with CMake and a C++ toolchain. Native PowerShell/cmd is not supported (the UI needs a Unix-style terminal + ncurses).
+Copy `build/libs/stacksquing-1.0.0.jar` into `.minecraft/mods`.
 
-### Requirements
+## Use
 
-- C++17 compiler (Clang or GCC; Xcode CLT on macOS)
-- CMake 3.16+
-- ncurses (macOS: via Xcode CLT; Linux: e.g. `sudo apt install libncurses-dev`)
-- `curl`, `tar`
+- Press `B` (rebindable under Controls -> stackSquing) to open the book. No book item is needed.
+- Press `B` with a chest, shulker box, hopper, dispenser, inventory, crafting table or furnace open to show the book beside it. The GUI scale drops so the recipe book and side book fit together.
+- Type commands on the bottom row. Type `help` for the full list.
+- PageUp/PageDown and the mouse wheel scroll. Up/Down recall history. Esc or `q` closes the book.
+- Long item names scroll.
 
-## Build from a local clone
+Litematica writes a **new timestamped file** on each export (e.g. `material_list_2026-07-14_23.17.52.txt`). After exporting again:
 
-### Using build.sh (recommended)
+- `reload` — re-read the current file, or switch to a newer `material_list_*.txt` in the same folder
+- `latest` — load the newest `material_list_*.txt` in the list folder
+- `files` — list material lists in the list folder, newest first
+- `open <n>` — open file n from the `files` list
+- `open <path>` — open a file or directory (relative paths use the list folder)
 
-```bash
-./build.sh          # clean, build, and install to ~/.local/bin
-./build.sh all      # same as above
-./build.sh clean    # remove build/
-./build.sh build    # configure and compile
-./build.sh install  # install to ~/.local/bin
-```
-
-Install to a custom location:
-
-```bash
-INSTALL_PREFIX=/usr/local ./build.sh install
-```
-
-### Manual build
-
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-cmake --install build --prefix ~/.local
-```
-
-Or copy the binary manually:
-
-```bash
-cp build/stackSquing ~/.local/bin/
-```
-
-Then run:
-
-```bash
-stackSquing /path/to/material_list.txt
-stackSquing /path/to/litematica/   # loads newest material_list_*.txt in that folder
-```
-
-## Usage
-
-Type `help` inside the app for a full scrollable list of commands.
-
-Litematica writes a **new timestamped file** on each export (e.g. `material_list_2026-07-14_23.17.52.txt`). The title bar shows which file is open. After exporting again:
-
-- `reload` — re-read the current file, or automatically switch to a newer `material_list_*.txt` in the same folder
-- `latest` — always load the newest `material_list_*.txt` in the same folder
-- `open <path>` — open a specific file or directory
-
-If the open file changes on disk while the app is running, the status bar prompts you to reload; fulfilling is blocked until you do, so an old in-memory list cannot overwrite a new export.
+If the open file changes on disk, fulfilling is blocked until you reload, so an old in-memory list cannot overwrite a new export.
 
 ### Quantity column
 
@@ -93,11 +45,11 @@ If the open file changes on disk while the app is running, the status bar prompt
 ### Quantity format
 
 - `raw` — plain item counts
-- `css` — chests/stacks/items, using each item's real max stack size from Java Edition (`5c+5s+10` for 8970 of a 64-stack item; signs/eggs/etc. use 16 per stack; unstackable items use chest slots of 27 with no `s` component)
+- `css` — chests/stacks/items, using each item's real max stack size (`5c+5s+10` for 8970 of a 64-stack item; signs/eggs/etc. use 16 per stack; unstackable items use chest slots of 27 with no `s` component)
 
 ### Groups
 
-Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). Terms may contain spaces (`include:light blue,blue wool`); commas separate terms. `exclude` terms still disqualify a match, unless a longer matching include term contains the exclude term (e.g. `include:light blue exclude:light` keeps Light Blue Wool).
+Groups are saved at `~/.config/stackSquing/groups.json` by default. Multiple `include` terms match if **any** term appears in the item name (e.g. `include:iron,anvil` matches both Iron Chain and Anvil). Terms may contain spaces (`include:light blue,blue wool`); commas separate terms. `exclude` terms still disqualify a match, unless a longer matching include term contains the exclude term (e.g. `include:light blue exclude:light` keeps Light Blue Wool).
 
 - `groups` — list saved groups and on/off state
 - `group add Deepslate include:deepslate`
@@ -109,16 +61,17 @@ Groups are saved globally at `~/.config/stackSquing/groups.json`. Multiple `incl
 - `group remove Deepslate`
 - `group order Deepslate 0`
 
-When groups are enabled, matching items are shown in consecutive blocks with a highlighted summary row at the top of each group. Items that are not in any enabled group appear first (above group blocks). Item names use leader dots to the quantity (table-of-contents style) so counts are easy to scan. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`). Groups that belong to an enabled supergroup are only shown inside that supergroup, not on their own.
+Groups can also be added, edited and deleted from the settings screen.
+
+When groups are enabled, matching items are shown in consecutive blocks with a summary row at the top of each group. Items that are not in any enabled group appear first. Items can appear in multiple groups; fulfilling any listing marks all copies as fulfilled and removes their quantity from group totals. Fully fulfilled groups are hidden by default (`hidefulfilled on`). Groups that belong to an enabled supergroup are only shown inside that supergroup.
 
 ### Supergroups
 
-Supergroups nest matching item groups under one summary total (each item counted once, fulfilled items excluded). Membership uses the same `include`/`exclude` syntax as groups, but terms match **group names** (not item names). Saved in the same config file as groups.
+Supergroups nest matching item groups under one summary total (each item counted once, fulfilled items excluded). Membership uses the same `include`/`exclude` syntax as groups, but terms match **group names** (not item names). Saved in the same file as groups.
 
 - `supergroups` — list saved supergroups and on/off state
 - `supergroup add smelting include:glass,terracotta,nether`
 - `supergroup edit wood include:oak,birch exclude:dark`
-- `supergroup add blues include:light blue`
 - `supergroup on Stone` / `supergroup off Stone`
 - `supergroup rename Stone Rock`
 - `supergroup remove Stone`
@@ -126,7 +79,7 @@ Supergroups nest matching item groups under one summary total (each item counted
 
 ### Fulfillment
 
-Items are numbered in display order. Mark an item fulfilled (strikes through in the UI and appends `a` to the line in the file):
+Items are numbered in display order. Mark an item fulfilled (strikes through in the book and appends `a` to the line in the file):
 
 - `fulfill 3` or `a 3`
 - `fulfill 14-24` or `a 14-24` — mark items 14 through 24 inclusive
@@ -140,46 +93,24 @@ Partial fulfillment subtracts an amount from the Missing (and Need) column and w
 - `u 4, 100` — un-add 100 (from a fully fulfilled item this leaves `a <missing − 100>`)
 - `u 4` — clears both full and partial fulfillment
 
-### Navigation
-
-- `up` / `down` — scroll the material list, help, or overview screen
-- `PageUp` / `PageDown` while typing — scroll one page; typed input is kept
-- Arrow keys while typing — move cursor, browse command history (up/down), toggle insert/overwrite (Insert), delete forward (Delete)
-- Resizing the terminal redraws the screen automatically; anything you were typing is kept
-
 ### Display
 
-- `overview` — show every saved supergroup and group (on/off state, include/exclude terms, membership) without any items; `up`/`down` scroll, any other command returns to the list
+- `overview` — show every saved supergroup and group (on/off state, include/exclude terms, membership) without any items
 - `hidefulfilled on` — hide groups/supergroups when all their items are fulfilled (default)
 - `hidefulfilled off` — keep showing fully fulfilled groups
+- `up` / `down` — scroll one row
 
-### Other
+## Settings (Mod Menu)
 
-- `reload` — re-read the current file, or load a newer `material_list_*.txt` in the same folder if Litematica created one
-- `latest` — load the newest `material_list_*.txt` in the same folder
-- `open <path>` — open a material list file or directory
-- `help` — show all available commands
-- `quit` or `q` — exit
+- List folder (default `.minecraft/config/litematica`)
+- Groups file (default `~/.config/stackSquing/groups.json`)
+- Quantity column and format
+- Hide fulfilled groups
+- Single page or two-page spread (falls back to single page on narrow windows)
+- Per-group and per-supergroup on/off, plus adding, editing and deleting groups
 
-## Minecraft mod (Fabric 26.3)
-
-The `fabric/` folder contains a client-only Fabric mod that shows the same material lists as a book and quill, with the full command set.
-
-**Requirements:** Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API, and optionally Mod Menu.
-
-**Build:** `cd fabric && ./gradlew build`, then copy `fabric/build/libs/stacksquing-1.0.0.jar` into `.minecraft/mods`.
-
-**Use:**
-
-- Press `B` (rebindable under Controls -> stackSquing) to open the book. No book item is needed.
-- Type commands on the bottom row. They are the same as the CLI, plus `files` and `open <n>`.
-- PageUp/PageDown and the mouse wheel scroll. Up/Down recall history. Esc or `q` closes the book.
-- Long item names scroll.
-
-**Settings (Mod Menu):** list folder (default `.minecraft/config/litematica`), groups file (default `~/.config/stackSquing/groups.json`, shared with the CLI), quantity column and format, hide fulfilled groups, single page or two-page spread (falls back to single page on narrow windows), and per-group and per-supergroup on/off. The book follows the vanilla GUI scale setting. Column, format and layout changed with book commands are saved too.
+The book follows the vanilla GUI scale setting. Column, format and layout changed with book commands are saved too.
 
 ## Example
 
-```bash
-stackSquing examples/sample_material_list.txt
-```
+`examples/sample_material_list.txt` is a sample Litematica export. Copy it into the list folder and `open` it from the book.

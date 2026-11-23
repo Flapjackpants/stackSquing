@@ -3,7 +3,7 @@ package com.flapjackpants.stacksquing.core;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Port of App::build_help_text, reworded for the book (no column padding, so lines can wrap). */
+/** Help screen lines for the book (no column padding, so lines can wrap). */
 public final class HelpText {
     private HelpText() {
     }

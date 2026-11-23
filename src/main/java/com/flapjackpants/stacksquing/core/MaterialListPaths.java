@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/** Port of src/paths.cpp. */
 public final class MaterialListPaths {
     private MaterialListPaths() {
     }

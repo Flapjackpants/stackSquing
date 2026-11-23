@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Port of src/stack_size.cpp. */
 public final class StackSize {
     private static final Set<String> STACK_OF_SIXTEEN = Set.of(
             "snowball", "egg", "blue egg", "brown egg",

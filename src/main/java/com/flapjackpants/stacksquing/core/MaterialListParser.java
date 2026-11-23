@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Port of src/parser.cpp. */
 public final class MaterialListParser {
     private static final String PLACEMENT_MARKER = "Material List for placement '";
 

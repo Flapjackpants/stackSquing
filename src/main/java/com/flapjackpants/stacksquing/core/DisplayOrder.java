@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** Port of src/display_order.cpp. */
 public final class DisplayOrder {
     private DisplayOrder() {
     }

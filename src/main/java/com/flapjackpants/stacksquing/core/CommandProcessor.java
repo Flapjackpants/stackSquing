@@ -13,7 +13,7 @@ import java.util.OptionalInt;
 import java.util.TreeSet;
 import java.util.function.Supplier;
 
-/** Port of App::handle_command and its helpers (src/app.cpp), without any terminal code. */
+/** Parses and runs book commands against the open material list. */
 public final class CommandProcessor {
     private static final String FILE_CHANGED_WARNING =
             "File changed on disk. Type reload (or latest for a newer export).";

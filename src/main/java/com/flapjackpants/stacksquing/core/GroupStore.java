@@ -14,7 +14,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-/** Port of src/groups.cpp. */
 public final class GroupStore {
     private Path configPath;
     private final List<ItemGroup> groups = new ArrayList<>();
