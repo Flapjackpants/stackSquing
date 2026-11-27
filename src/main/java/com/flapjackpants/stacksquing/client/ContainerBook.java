@@ -12,13 +12,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
-import net.minecraft.client.gui.screens.inventory.ContainerScreen;
-import net.minecraft.client.gui.screens.inventory.CraftingScreen;
-import net.minecraft.client.gui.screens.inventory.DispenserScreen;
-import net.minecraft.client.gui.screens.inventory.HopperScreen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
 
 public final class ContainerBook {
@@ -36,10 +30,7 @@ public final class ContainerBook {
     }
 
     public static boolean eligible(Screen screen) {
-        return screen instanceof ContainerScreen || screen instanceof ShulkerBoxScreen
-                || screen instanceof HopperScreen || screen instanceof DispenserScreen
-                || screen instanceof InventoryScreen || screen instanceof CraftingScreen
-                || screen instanceof AbstractFurnaceScreen;
+        return screen instanceof AbstractContainerScreen;
     }
 
     public static boolean active(Screen screen, int screenWidth, int imageWidth) {
@@ -59,17 +50,19 @@ public final class ContainerBook {
                 && !BookText.recipeAndBookFit(Minecraft.getInstance().getWindow().getWidth(), imageWidth);
     }
 
-    /** Window.calculateScale result, lowered while the current screen shows the recipe book and the side book. */
+    /** Window.calculateScale result, lowered while the current screen is too wide for itself, its recipe book and the side book. */
     public static int capScale(int vanillaScale, int framebufferWidth) {
         Minecraft mc = Minecraft.getInstance();
         if (!shown || mc == null || mc.gui == null) {
             return vanillaScale;
         }
         Screen s = mc.gui.screen();
-        if (!(eligible(s) && s instanceof RecipeBookHost r && r.stacksquing$recipeBookVisible())) {
+        if (!eligible(s)) {
             return vanillaScale;
         }
-        return BookText.recipeScale(vanillaScale, framebufferWidth, ((ContainerBookHost) s).stacksquing$imageWidth());
+        boolean recipeOpen = s instanceof RecipeBookHost r && r.stacksquing$recipeBookVisible();
+        return BookText.fittedScale(vanillaScale, framebufferWidth, ((ContainerBookHost) s).stacksquing$imageWidth(),
+                recipeOpen);
     }
 
     /** Applies the capped scale if it differs from the window's; true if the screen was resized (and so re-initialised). */

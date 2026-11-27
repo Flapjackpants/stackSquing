@@ -105,10 +105,11 @@ public final class BookText {
         return displayNumber + ") ";
     }
 
-    /** Largest GUI scale up to vanillaScale at which the recipe book, container and side book fit; vanillaScale if none. */
-    public static int recipeScale(int vanillaScale, int framebufferWidth, int imageWidth) {
+    /** Largest GUI scale up to vanillaScale at which the container (and recipe book if open) fit beside the side book; vanillaScale if none. */
+    public static int fittedScale(int vanillaScale, int framebufferWidth, int imageWidth, boolean recipeOpen) {
         for (int s = vanillaScale; s >= 1; s--) {
-            if (recipeAndBookFit(framebufferWidth / s, imageWidth)) {
+            int w = framebufferWidth / s;
+            if (recipeOpen ? recipeAndBookFit(w, imageWidth) : containerBookFits(w, imageWidth)) {
                 return s;
             }
         }

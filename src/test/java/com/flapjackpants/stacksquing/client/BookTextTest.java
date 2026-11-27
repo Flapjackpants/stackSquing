@@ -109,16 +109,19 @@ class BookTextTest {
     }
 
     @Test
-    void recipeScaleLowersUntilFit() {
-        assertEquals(5, BookText.recipeScale(6, 2560, 176));
-        assertEquals(6, BookText.recipeScale(7, 2880, 176));
-        assertEquals(2, BookText.recipeScale(3, 1366, 176));
+    void fittedScaleLowersUntilFit() {
+        assertEquals(5, BookText.fittedScale(6, 2560, 176, true));
+        assertEquals(6, BookText.fittedScale(7, 2880, 176, true));
+        assertEquals(2, BookText.fittedScale(3, 1366, 176, true));
+        assertEquals(3, BookText.fittedScale(4, 1280, 176, false));
+        assertEquals(2, BookText.fittedScale(3, 1000, 276, false));
+        assertEquals(2, BookText.fittedScale(4, 1000, 200, false));
     }
 
     @Test
-    void recipeScaleKeepsVanilla() {
-        assertEquals(4, BookText.recipeScale(4, 1920, 176));
-        assertEquals(3, BookText.recipeScale(3, 400, 176));
-        assertEquals(1, BookText.recipeScale(1, 1000, 176));
+    void fittedScaleKeepsVanilla() {
+        assertEquals(4, BookText.fittedScale(4, 1920, 176, true));
+        assertEquals(3, BookText.fittedScale(3, 400, 176, true));
+        assertEquals(1, BookText.fittedScale(1, 1000, 176, true));
     }
 }
